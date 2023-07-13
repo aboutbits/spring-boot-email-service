@@ -1,0 +1,16 @@
+{
+    "properties": [
+        {
+            "name": "lib.emailservice.scheduling.enabled",
+            "type": "java.lang.Boolean",
+            "description": "Enables the scheduler sending the emails.",
+            "defaultValue": true
+        },
+        {
+            "name": "lib.emailservice.scheduling.interval",
+            "type": "java.lang.Long",
+            "description": "Specifies the milliseconds delay between runs of the scheduler.",
+            "defaultValue": 30000
+        }
+    ]
+}
