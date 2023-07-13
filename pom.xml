@@ -75,7 +75,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/aboutbits/spring-boot-sendEmailCommand-service</url>
+            <url>https://maven.pkg.github.com/aboutbits/spring-boot-email-service</url>
         </repository>
     </distributionManagement>
 </project>
