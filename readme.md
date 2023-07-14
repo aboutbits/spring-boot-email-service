@@ -4,7 +4,7 @@ A reusable mailer service to send emails.
 
 ## Setup
 
-Add the mailer service to the classpath by adding the following maven dependeny:
+Add the mailer service to the classpath by adding the following maven dependency. Versions haven be found [here](../../packages)
 
 ```xml
 
@@ -15,14 +15,18 @@ Add the mailer service to the classpath by adding the following maven dependeny:
 </dependency>
 ```
 
+### Attachments
+
 If you want to use attachments, you will have to create a bean implementing this interface: [AttachmentDataSource.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2FAttachmentDataSource.java)  
 This step is optional.
 
 ## Usage
 
-Use the `ManageEmail` service to schedule sending an email.
+### Sending an Email
 
-### Example
+Use the `ManageEmail` service to schedule an email.
+
+#### Example
 
 ```java
 // @formatter:off
@@ -44,11 +48,15 @@ public void sendMail(final String to,final String subject,final String htmlBody,
 // @formatter:on 
 ```
 
+### Querying Emails
+
 To read email datasets from the database use this class: [QueryEmail.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2Fapplication%2FQueryEmail.java)
+
+### Reporting callback
 
 If you want to receive a report after each run of the scheduler, create a Bean implementing [EmailSchedulerCallback.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2FEmailSchedulerCallback.java)
 
-## Configuration
+### Configuration
 
 You will have to enable `EntityScanning` for the package as well as your main package. You must also add it to the base packages for Spring to scan.
 
@@ -57,12 +65,12 @@ You will have to enable `EntityScanning` for the package as well as your main pa
 @EntityScan({"the.main.package", "it.aboutbits.springboot.emailservice"})
 ```
 
-Available configuration options are:
+The following configuration options are available:
 
-```yaml
-lib.emailservice.scheduling.enabled: true
-lib.emailservice.scheduling.interval: 30000
-```
+| Name                                       | Default     | Description                                                             |
+|--------------------------------------------|-------------|-------------------------------------------------------------------------|
+| `lib.emailservice.scheduling.enabled`      | true        | Enables the scheduler sending the emails.                               |
+| `lib.emailservice.scheduling.interval`     | 30000       | Specifies the milliseconds delay between runs of the scheduler.         |
 
 ## Building and releasing a new version:
 
