@@ -1,6 +1,12 @@
 {
     "properties": [
         {
+            "name": "lib.emailservice.liquibase.enabled",
+            "type": "java.lang.Boolean",
+            "description": "Enables liquibase migrations.",
+            "defaultValue": true
+        },
+        {
             "name": "lib.emailservice.scheduling.enabled",
             "type": "java.lang.Boolean",
             "description": "Enables the scheduler sending the emails.",

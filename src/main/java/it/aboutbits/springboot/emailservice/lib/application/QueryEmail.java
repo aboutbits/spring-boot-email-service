@@ -1,9 +1,11 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
 
+import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -17,26 +19,42 @@ import java.util.Optional;
 
 @RequiredArgsConstructor
 public class QueryEmail {
-    private final EmailRepository emailNotificationRepository;
+    private final EmailRepository emailRepository;
+    private final EmailMapper emailMapper;
+    private final EntityManager entityManager;
 
-    public Page<Email> paginatedByState(final EmailState state, final PageRequest pageParameter) {
+    public Page<EmailDto> paginatedByState(final EmailState state, final PageRequest pageParameter) {
         var pageRequest = PageRequest.of(pageParameter.getPageNumber(), pageParameter.getPageSize(), Sort.by("updatedAt"));
 
-        return emailNotificationRepository.findByState(state, pageRequest);
+        return emailMapper.toDto(emailRepository.findByState(state, pageRequest));
     }
 
-    public List<Email> byIds(final Collection<Long> ids) {
+    public List<EmailDto> byIds(final Collection<Long> ids) {
         if (ids.isEmpty()) {
             return Collections.emptyList();
         }
-        return emailNotificationRepository.findByIdIn(ids);
+        return emailMapper.toDto(emailRepository.findByIdIn(ids));
     }
 
-    public List<Email> readyToSend() {
-        return emailNotificationRepository.findReadyToSend(OffsetDateTime.now());
+    List<Email> readyToSend() {
+        var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
+        return entityManager.createQuery("""
+                        SELECT e from Email e WHERE e.sendingScheduledAt < :scheduledBefore AND e.state IN (
+                            it.aboutbits.springboot.emailservice.lib.EmailState.PENDING,
+                            it.aboutbits.springboot.emailservice.lib.EmailState.ERROR
+                        )
+                        """, Email.class)
+                .setParameter("scheduledBefore", OffsetDateTime.now())
+                .setHint("jakarta.persistence.fetchgraph", entityGraph)
+                .getResultList();
+        //return emailRepository.findReadyToSend(OffsetDateTime.now());
     }
 
-    public Optional<Email> byId(final long id) {
-        return emailNotificationRepository.findById(id);
+    public Optional<EmailDto> byId(final long id) {
+        return emailRepository.findById(id).map(emailMapper::toDto);
+    }
+
+    public List<EmailDto> byReference(final String reference) {
+        return emailMapper.toDto(emailRepository.findByReference(reference));
     }
 }

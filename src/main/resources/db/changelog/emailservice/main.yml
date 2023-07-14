@@ -1,0 +1,6 @@
+databaseChangeLog:
+  - include:
+      file: classpath:db/changelog/master.yml
+  - include:
+      file: 2023-01-30-create-email-tables.yml
+      relativeToChangelogFile: true

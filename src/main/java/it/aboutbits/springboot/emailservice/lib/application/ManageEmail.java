@@ -2,7 +2,9 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
+import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
+import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
 import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
@@ -25,25 +27,27 @@ import java.util.stream.Collectors;
 @Validated
 @Log4j2
 public class ManageEmail {
-    private final EmailRepository emailNotificationRepository;
+    private final EmailRepository emailRepository;
     private final JavaMailSender mailSender;
     private final AttachmentDataSource attachmentDataSource;
+    private final EmailMapper emailMapper;
 
     public ManageEmail(
-            EmailRepository emailNotificationRepository,
+            EmailRepository emailRepository,
             JavaMailSender mailSender,
-            AttachmentDataSource attachmentDataSource
-    ) {
+            AttachmentDataSource attachmentDataSource,
+            final EmailMapper emailMapper) {
 
-        this.emailNotificationRepository = emailNotificationRepository;
+        this.emailRepository = emailRepository;
         this.mailSender = mailSender;
         this.attachmentDataSource = attachmentDataSource;
+        this.emailMapper = emailMapper;
     }
 
-    public Email schedule(@NonNull @Valid EmailParameter parameter) {
+    public EmailDto schedule(@NonNull @Valid EmailParameter parameter) {
         var emailData = parameter.email();
 
-        var email = new Email();
+        final var email = new Email();
         email.setState(EmailState.PENDING);
         email.setSendingScheduledAt(parameter.scheduleAt());
         email.setReference(parameter.reference());
@@ -56,6 +60,7 @@ public class ManageEmail {
         email.setAttachments(emailData.attachments().stream()
                 .map(a -> {
                     var attachment = new EmailAttachment();
+                    attachment.setEmail(email);
                     attachment.setReference(a.reference());
                     attachment.setContentType(a.contentType());
                     attachment.setFileName(a.fileName());
@@ -64,42 +69,48 @@ public class ManageEmail {
                 .collect(Collectors.toSet())
         );
 
-        email = emailNotificationRepository.save(email);
+        var savedEmail = emailRepository.save(email);
 
-        return email;
+        return emailMapper.toDto(savedEmail);
     }
 
-    Email send(Email notification) {
-        if (EmailState.SENT.equals(notification.getState())) {
-            return notification;
+    Email send(Email email) {
+        if (EmailState.SENT.equals(email.getState())) {
+            return email;
         }
 
         try {
-            sendMail(notification);
-            notification.setState(EmailState.SENT);
-            notification.setErrorMessage("");
-            notification.setSentAt(OffsetDateTime.now());
-        } catch (MessagingException | IOException e) {
+            sendMail(email);
+            email.setState(EmailState.SENT);
+            email.setErrorMessage("");
+            email.setSentAt(OffsetDateTime.now());
+        } catch (MessagingException | AttachmentException | IOException e) {
             log.error("Failed to send email", e);
-            notification.setErrorMessage(e.getMessage());
-            notification.setState(EmailState.ERROR);
+            email.setErrorMessage(e.getMessage());
+            email.setState(EmailState.ERROR);
         }
 
-        var updatedNotification = emailNotificationRepository.save(notification);
+        var updatedEmail = emailRepository.save(email);
 
-        if (updatedNotification.isSent()) {
-            cleanupAttachments(notification);
+        if (updatedEmail.isSent()) {
+            try {
+                cleanupAttachments(email);
+            } catch (AttachmentException e) {
+                throw new IllegalStateException(e);
+            }
         }
 
-        return updatedNotification;
+        return updatedEmail;
     }
 
-    private void cleanupAttachments(final Email notification) {
-        notification.getAttachments().forEach(a -> attachmentDataSource.releaseAttachment(a.getReference()));
+    private void cleanupAttachments(final Email email) throws AttachmentException {
+        for (var attachment : email.getAttachments()) {
+            attachmentDataSource.releaseAttachment(attachment.getReference());
+        }
     }
 
 
-    private void sendMail(Email notification) throws MessagingException, IOException {
+    private void sendMail(Email notification) throws MessagingException, IOException, AttachmentException {
         sendMail(
                 notification.getFromAddress(),
                 notification.getFromName(),
@@ -111,7 +122,7 @@ public class ManageEmail {
         );
     }
 
-    private void sendMail(String fromAddress, String fromName, List<String> recipients, String subject, String htmlBody, String plainTextBody, Set<EmailAttachment> attachments) throws MessagingException, IOException {
+    private void sendMail(String fromAddress, String fromName, List<String> recipients, String subject, String htmlBody, String plainTextBody, Set<EmailAttachment> attachments) throws MessagingException, IOException, AttachmentException {
         var message = mailSender.createMimeMessage();
         var helper = new MimeMessageHelper(message, true, "UTF-8");
 

@@ -58,19 +58,27 @@ If you want to receive a report after each run of the scheduler, create a Bean i
 
 ### Configuration
 
-You will have to enable `EntityScanning` for the package as well as your main package. You must also add it to the base packages for Spring to scan.
+To enable this service just add `@EnableEmailService` to your main class. You must also enable `@EnableScheduling` to allow the email queue to be processed.
 
 ```java
-@SpringBootApplication(scanBasePackages = {"the.main.package", "it.aboutbits.springboot.emailservice"})
-@EntityScan({"the.main.package", "it.aboutbits.springboot.emailservice"})
+
+@SpringBootApplication
+@EnableEmailService
+@EnableScheduling
+public class App {
+    public static void main(final String[] args) {
+        SpringApplication.run(App.class, args);
+    }
+}
 ```
 
 The following configuration options are available:
 
-| Name                                       | Default     | Description                                                             |
-|--------------------------------------------|-------------|-------------------------------------------------------------------------|
-| `lib.emailservice.scheduling.enabled`      | true        | Enables the scheduler sending the emails.                               |
-| `lib.emailservice.scheduling.interval`     | 30000       | Specifies the milliseconds delay between runs of the scheduler.         |
+| Name                                       | Default     | Description                                                                                                              |
+|--------------------------------------------|-------------|--------------------------------------------------------------------------------------------------------------------------|
+| `lib.emailservice.liquibase.enabled`       | true        | Enables liquibase migrations. **attention** `classpath:db/changelog/master.yml` will be run first and must be present!   |
+| `lib.emailservice.scheduling.enabled`      | true        | Enables the scheduler sending the emails.                                                                                |
+| `lib.emailservice.scheduling.interval`     | 30000       | Specifies the milliseconds delay between runs of the scheduler.                                                          |
 
 ## Building and releasing a new version:
 

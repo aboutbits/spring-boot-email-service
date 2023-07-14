@@ -5,6 +5,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,7 +27,7 @@ import java.util.Set;
 @NamedEntityGraph(
         name = "email_service_emails-entity-graph",
         attributeNodes = {
-                @NamedAttributeNode("recipients")
+                @NamedAttributeNode("attachments")
         }
 )
 @Entity
@@ -52,7 +53,7 @@ public class Email {
     private String textBody;
     private String htmlBody;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "email", orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<EmailAttachment> attachments;
 
     private String reference;
