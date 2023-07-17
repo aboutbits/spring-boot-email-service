@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Tag Deployment
-        uses: aboutbits/github-actions-git/create-or-update-tag@v1
+        uses: aboutbits/github-actions-base/git-create-or-update-tag@v1
         with:
           tag-name: ${{ github.event.inputs.version }}
           user-name: 'AboutBits'
