@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
+import it.aboutbits.springboot.emailservice.lib.AttachmentReference;
 import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
@@ -61,7 +62,7 @@ public class ManageEmail {
                 .map(a -> {
                     var attachment = new EmailAttachment();
                     attachment.setEmail(email);
-                    attachment.setReference(a.reference());
+                    attachment.setReference(a.reference().value());
                     attachment.setContentType(a.contentType());
                     attachment.setFileName(a.fileName());
                     return attachment;
@@ -105,7 +106,7 @@ public class ManageEmail {
 
     private void cleanupAttachments(final Email email) throws AttachmentException {
         for (var attachment : email.getAttachments()) {
-            attachmentDataSource.releaseAttachment(attachment.getReference());
+            attachmentDataSource.releaseAttachment(new AttachmentReference(attachment.getReference()));
         }
     }
 
@@ -138,7 +139,7 @@ public class ManageEmail {
 
         if (!attachments.isEmpty()) {
             for (var attachment : attachments) {
-                var payload = attachmentDataSource.getAttachmentPayload(attachment.getReference());
+                var payload = attachmentDataSource.getAttachmentPayload(new AttachmentReference(attachment.getReference()));
                 helper.addAttachment(attachment.getFileName(), new ByteArrayResource(payload.readAllBytes()));
                 payload.close();
             }

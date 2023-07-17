@@ -1,5 +1,6 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
+import it.aboutbits.springboot.emailservice.lib.AttachmentReference;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
@@ -48,8 +49,7 @@ public record EmailParameter(
         @Builder
         public record Attachment(
                 @NonNull
-                @NotBlank
-                String reference,
+                AttachmentReference reference,
                 @NonNull
                 @NotBlank
                 String fileName,
