@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.lang.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.Collection;
@@ -23,13 +24,13 @@ public class QueryEmail {
     private final EmailMapper emailMapper;
     private final EntityManager entityManager;
 
-    public Page<EmailDto> paginatedByState(final EmailState state, final PageRequest pageParameter) {
+    public Page<EmailDto> paginatedByState(EmailState state, PageRequest pageParameter) {
         var pageRequest = PageRequest.of(pageParameter.getPageNumber(), pageParameter.getPageSize(), Sort.by("updatedAt"));
 
         return emailMapper.toDto(emailRepository.findByState(state, pageRequest));
     }
 
-    public List<EmailDto> byIds(final Collection<Long> ids) {
+    public List<EmailDto> byIds(Collection<Long> ids) {
         if (ids.isEmpty()) {
             return Collections.emptyList();
         }
@@ -49,11 +50,11 @@ public class QueryEmail {
                 .getResultList();
     }
 
-    public Optional<EmailDto> byId(final long id) {
+    public Optional<EmailDto> byId(long id) {
         return emailRepository.findById(id).map(emailMapper::toDto);
     }
 
-    public List<EmailDto> byReference(final String reference) {
+    public List<EmailDto> byReference(@Nullable String reference) {
         return emailMapper.toDto(emailRepository.findByReference(reference));
     }
 }
