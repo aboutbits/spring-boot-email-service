@@ -6,32 +6,28 @@ import it.aboutbits.springboot.emailservice.lib.application.EmailAttachmentMappe
 import it.aboutbits.springboot.emailservice.lib.application.EmailAttachmentMapperImpl;
 import it.aboutbits.springboot.emailservice.lib.application.EmailMapper;
 import it.aboutbits.springboot.emailservice.lib.application.EmailMapperImpl;
+import it.aboutbits.springboot.emailservice.lib.application.EmailServiceMigrator;
 import it.aboutbits.springboot.emailservice.lib.application.ManageEmail;
 import it.aboutbits.springboot.emailservice.lib.application.QueryEmail;
 import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
 import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import jakarta.persistence.EntityManager;
-import liquibase.integration.spring.SpringLiquibase;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 
-import javax.sql.DataSource;
 import java.util.List;
 
 @AutoConfigurationPackage
 public class EmailServiceConfiguration {
-    @Bean
-    @ConditionalOnProperty(value = "lib.emailservice.liquibase.enabled", matchIfMissing = true)
-    public SpringLiquibase springLiquibase(DataSource dataSource) {
-        var liquibase = new SpringLiquibase();
-        liquibase.setDataSource(dataSource);
-        liquibase.setChangeLog("classpath:/db/changelog/emailservice/main.yml");
-        liquibase.setShouldRun(true);
-        return liquibase;
+    @Bean(initMethod = "init")
+    @ConditionalOnProperty(value = "lib.emailservice.migrations.enabled", matchIfMissing = true)
+    public EmailServiceMigrator springLiquibase(JdbcTemplate jdbcTemplate) {
+        return new EmailServiceMigrator(jdbcTemplate);
     }
 
     @Bean

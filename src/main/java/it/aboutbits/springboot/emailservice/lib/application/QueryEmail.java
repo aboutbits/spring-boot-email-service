@@ -47,7 +47,6 @@ public class QueryEmail {
                 .setParameter("scheduledBefore", OffsetDateTime.now())
                 .setHint("jakarta.persistence.fetchgraph", entityGraph)
                 .getResultList();
-        //return emailRepository.findReadyToSend(OffsetDateTime.now());
     }
 
     public Optional<EmailDto> byId(final long id) {

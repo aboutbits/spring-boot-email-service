@@ -74,11 +74,11 @@ public class App {
 
 The following configuration options are available:
 
-| Name                                       | Default     | Description                                                                                                              |
-|--------------------------------------------|-------------|--------------------------------------------------------------------------------------------------------------------------|
-| `lib.emailservice.liquibase.enabled`       | true        | Enables liquibase migrations. **attention** `classpath:db/changelog/master.yml` will be run first and must be present!   |
-| `lib.emailservice.scheduling.enabled`      | true        | Enables the scheduler sending the emails.                                                                                |
-| `lib.emailservice.scheduling.interval`     | 30000       | Specifies the milliseconds delay between runs of the scheduler.                                                          |
+| Name                                   | Default     | Description                                                           |
+|----------------------------------------|-------------|-----------------------------------------------------------------------|
+| `lib.emailservice.migrations.enabled`  | true        | Enables database migrations.                                          |
+| `lib.emailservice.scheduling.enabled`  | true        | Enables the scheduler sending the emails.                             |
+| `lib.emailservice.scheduling.interval` | 30000       | Specifies the milliseconds delay between runs of the scheduler.       |
 
 ## Building and releasing a new version:
 

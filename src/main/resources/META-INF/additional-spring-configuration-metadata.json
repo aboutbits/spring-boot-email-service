@@ -1,9 +1,9 @@
 {
     "properties": [
         {
-            "name": "lib.emailservice.liquibase.enabled",
+            "name": "lib.emailservice.migrations.enabled",
             "type": "java.lang.Boolean",
-            "description": "Enables liquibase migrations.",
+            "description": "Enables database migrations.",
             "defaultValue": true
         },
         {
