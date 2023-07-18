@@ -6,11 +6,7 @@
 
 <suppressions>
     <suppress checks="Javadoc" files="."/>
-    <!--<suppress checks="JavadocPackage" files="."/>-->
-    <!--<suppress checks="DesignForExtension" files="."/>-->
-    <!--<suppress checks="LineLength" files="."/>-->
     <suppress checks="MethodName" files=".*[\\/]src[\\/](test|it)[\\/]"/>
     <suppress checks="VisibilityModifier" files=".*[\\/]src[\\/](test|it)[\\/]"/>
-    <!--<suppress checks="FinalParameters" files=".*[\\/]src[\\/](test|it)[\\/]"/>-->
     <suppress checks="FileTabCharacter" files=".*[\\/]src[\\/](test|it)[\\/]"/>
 </suppressions>
