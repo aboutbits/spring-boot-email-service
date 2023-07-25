@@ -13,9 +13,10 @@ import java.util.Set;
 
 @Builder
 public record EmailParameter(
-        @NonNull OffsetDateTime scheduledAt,
-
-        @NonNull Email email
+        @NonNull
+        OffsetDateTime scheduledAt,
+        @NonNull
+        Email email
 ) {
 
     @Builder

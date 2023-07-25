@@ -4,7 +4,7 @@ public interface EmailSchedulerCallback {
     void report(Report report);
 
     record Report(
-            int totalAttempted,
+            int total,
             int sent,
             int errors
     ) {
