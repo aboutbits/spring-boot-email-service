@@ -62,6 +62,9 @@ public class Email {
     @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<EmailAttachment> attachments;
 
+    @Builder.Default
+    private boolean attachmentsCleaned = false;
+
     private OffsetDateTime scheduledAt;
     private OffsetDateTime sentAt;
 
@@ -76,5 +79,9 @@ public class Email {
 
     public boolean isSent() {
         return EmailState.SENT.equals(state);
+    }
+
+    public boolean hasFailed() {
+        return EmailState.ERROR.equals(state);
     }
 }

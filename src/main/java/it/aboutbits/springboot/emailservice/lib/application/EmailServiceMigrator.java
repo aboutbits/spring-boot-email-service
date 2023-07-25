@@ -28,7 +28,8 @@ public class EmailServiceMigrator {
                      text_body            text                                             not null,
                      html_body            text                                             not null,
                      attachments          jsonb                    default '[]'::jsonb,
-                     scheduled_at timestamp with time zone default now()           not null,
+                     attachments_cleaned  bool                     default false           not null,
+                     scheduled_at timestamp with time zone default now()                   not null,
                      sent_at              timestamp with time zone,
                      error_at             timestamp with time zone,
                      error_message        text,
@@ -41,8 +42,11 @@ public class EmailServiceMigrator {
                  create index if not exists email_service_emails_state_index
                      on email_service_emails (state);
 
-                 create index if not exists email_service_emails_sending_scheduled_at_index
+                 create index if not exists email_service_emails_scheduled_at_index
                      on email_service_emails (scheduled_at);
+                     
+                 create index if not exists email_service_emails_attachments_cleaned_index
+                     on email_service_emails (attachments_cleaned);
 
                  create table if not exists email_service_email_attachments
                  (

@@ -39,12 +39,21 @@ public class QueryEmail {
     List<Email> readyToSend() {
         var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
         return entityManager.createQuery("""
-                        SELECT e from Email e WHERE e.sendingScheduledAt < :scheduledBefore AND e.state IN (
+                        SELECT e from Email e WHERE e.scheduledAt < :scheduledBefore AND e.state IN (
                             it.aboutbits.springboot.emailservice.lib.EmailState.PENDING,
                             it.aboutbits.springboot.emailservice.lib.EmailState.ERROR
                         )
                         """, Email.class)
                 .setParameter("scheduledBefore", OffsetDateTime.now())
+                .setHint("jakarta.persistence.fetchgraph", entityGraph)
+                .getResultList();
+    }
+
+    List<Email> readyToCleanup() {
+        var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
+        return entityManager.createQuery("""
+                        SELECT e from Email e WHERE e.attachmentsCleaned=false AND e.state=it.aboutbits.springboot.emailservice.lib.EmailState.SENT
+                        """, Email.class)
                 .setHint("jakarta.persistence.fetchgraph", entityGraph)
                 .getResultList();
     }

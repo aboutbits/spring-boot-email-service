@@ -13,6 +13,11 @@ public final class UnavailableAttachmentDataSource implements AttachmentDataSour
     }
 
     @Override
+    public AttachmentReference storeAttachmentPayload(InputStream payload) throws AttachmentException {
+        throw new AttachmentException("attachments not available");
+    }
+
+    @Override
     public void releaseAttachment(AttachmentReference reference) throws AttachmentException {
         throw new AttachmentException("attachments not available");
     }

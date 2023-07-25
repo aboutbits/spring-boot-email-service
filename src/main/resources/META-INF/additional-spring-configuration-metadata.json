@@ -13,6 +13,12 @@
             "defaultValue": true
         },
         {
+            "name": "aboutbits.emailservice.scheduling.cleanup.enabled",
+            "type": "java.lang.Boolean",
+            "description": "Enables cleanup of attachment files after sending.",
+            "defaultValue": true
+        },
+        {
             "name": "aboutbits.emailservice.scheduling.interval",
             "type": "java.lang.Long",
             "description": "Specifies the milliseconds delay between runs of the scheduler.",

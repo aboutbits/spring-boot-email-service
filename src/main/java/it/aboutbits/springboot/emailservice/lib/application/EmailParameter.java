@@ -1,12 +1,12 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
-import it.aboutbits.springboot.emailservice.lib.AttachmentReference;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
 
+import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
@@ -47,7 +47,7 @@ public record EmailParameter(
         @Builder
         public record Attachment(
                 @NonNull
-                AttachmentReference reference,
+                InputStream payload,
                 @NonNull
                 @NotBlank
                 String fileName,

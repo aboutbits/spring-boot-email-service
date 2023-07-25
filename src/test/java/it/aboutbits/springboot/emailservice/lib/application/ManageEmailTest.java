@@ -1,7 +1,10 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
+import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.AttachmentReference;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
+import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
+import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,9 +12,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mail.javamail.JavaMailSender;
 
+import java.io.ByteArrayInputStream;
 import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @WithPostgres
@@ -19,11 +25,14 @@ class ManageEmailTest {
     @MockBean
     JavaMailSender javaMailSender;
 
+    @MockBean
+    AttachmentDataSource attachmentDataSource;
+
     @Autowired
     private ManageEmail manageEmail;
 
     @Test
-    void givenRequiredParameters_schedule_shouldCreateNewNotification() {
+    void givenRequiredParameters_schedule_shouldCreateNewNotification() throws EmailException {
         var parameter = EmailParameter.builder()
                 .scheduledAt(OffsetDateTime.now())
                 .email(EmailParameter.Email.builder()
@@ -52,7 +61,9 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameterWithAttachedFiles_schedule_shouldCreateNewNotification() {
+    void givenRequiredParameterWithAttachedFiles_schedule_shouldCreateNewNotification() throws EmailException, AttachmentException {
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(new AttachmentReference("ref"));
+
         var parameter = EmailParameter.builder()
                 .scheduledAt(OffsetDateTime.now())
                 .email(EmailParameter.Email.builder()
@@ -65,7 +76,7 @@ class ManageEmailTest {
                                 EmailParameter.Email.Attachment.builder()
                                         .contentType("image/png")
                                         .fileName("x.png")
-                                        .reference(new AttachmentReference("something"))
+                                        .payload(new ByteArrayInputStream(new byte[0]))
                                         .build()
                         )
                         .fromAddress("somebody@aboutbits.it")
