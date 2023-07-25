@@ -11,7 +11,7 @@ public class EmailServiceMigrator {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    void init() {
+    void migrate() {
         log.info("EmailService: running DB migrations...");
 
         jdbcTemplate.execute("""
@@ -61,6 +61,6 @@ public class EmailServiceMigrator {
 
                 """);
 
-        log.info("EmailService: done!");
+        log.info("EmailService: migrations done!");
     }
 }

@@ -25,7 +25,7 @@ import java.util.List;
 @AutoConfigurationPackage
 public class EmailServiceConfiguration {
     @Bean(initMethod = "init")
-    @ConditionalOnProperty(value = "lib.emailservice.migrations.enabled", matchIfMissing = true)
+    @ConditionalOnProperty(value = "aboutbits.emailservice.migrations.enabled", matchIfMissing = true)
     public EmailServiceMigrator springLiquibase(JdbcTemplate jdbcTemplate) {
         return new EmailServiceMigrator(jdbcTemplate);
     }
@@ -51,7 +51,7 @@ public class EmailServiceConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(value = "lib.emailservice.scheduling.enabled", matchIfMissing = true)
+    @ConditionalOnProperty(value = "aboutbits.emailservice.scheduling.enabled", matchIfMissing = true)
     public SendScheduledEmails sendScheduledEmails(QueryEmail queryEmail, ManageEmail manageEmail, List<EmailSchedulerCallback> callbacks) {
         return new SendScheduledEmails(queryEmail, manageEmail, callbacks);
     }

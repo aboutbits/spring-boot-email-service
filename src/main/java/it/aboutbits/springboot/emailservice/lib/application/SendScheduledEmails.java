@@ -17,7 +17,7 @@ public class SendScheduledEmails {
     private final ManageEmail manageEmail;
     private final List<EmailSchedulerCallback> callbacks;
 
-    @Scheduled(initialDelayString = "${lib.emailservice.scheduling.interval:30000}", fixedDelayString = "${lib.emailservice.scheduling.interval:30000}")
+    @Scheduled(initialDelayString = "${aboutbits.emailservice.scheduling.interval:30000}", fixedDelayString = "${aboutbits.emailservice.scheduling.interval:30000}")
     void sendEmailNotifications() {
         log.info("Start: " + JOB_DESCRIPTION);
 

@@ -1,19 +1,19 @@
 {
     "properties": [
         {
-            "name": "lib.emailservice.migrations.enabled",
+            "name": "aboutbits.emailservice.migrations.enabled",
             "type": "java.lang.Boolean",
             "description": "Enables database migrations.",
             "defaultValue": true
         },
         {
-            "name": "lib.emailservice.scheduling.enabled",
+            "name": "aboutbits.emailservice.scheduling.enabled",
             "type": "java.lang.Boolean",
             "description": "Enables the scheduler sending the emails.",
             "defaultValue": true
         },
         {
-            "name": "lib.emailservice.scheduling.interval",
+            "name": "aboutbits.emailservice.scheduling.interval",
             "type": "java.lang.Long",
             "description": "Specifies the milliseconds delay between runs of the scheduler.",
             "defaultValue": 30000
