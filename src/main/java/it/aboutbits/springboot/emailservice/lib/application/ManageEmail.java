@@ -160,12 +160,10 @@ public class ManageEmail {
             helper.setText(plainTextBody);
         }
 
-        if (!attachments.isEmpty()) {
-            for (var attachment : attachments) {
-                var payload = attachmentDataSource.getAttachmentPayload(new AttachmentReference(attachment.getReference()));
-                helper.addAttachment(attachment.getFileName(), new ByteArrayResource(payload.readAllBytes()));
-                payload.close();
-            }
+        for (var attachment : attachments) {
+            var payload = attachmentDataSource.getAttachmentPayload(new AttachmentReference(attachment.getReference()));
+            helper.addAttachment(attachment.getFileName(), new ByteArrayResource(payload.readAllBytes()));
+            payload.close();
         }
 
         mailSender.send(message);
