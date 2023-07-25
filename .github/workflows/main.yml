@@ -21,7 +21,7 @@ jobs:
       - uses: aboutbits/github-actions-java/setup-and-install@v1
 
       - name: Set Version
-        run: sed -i 's/<version>BUILD-SNAPSHOT<\/version>/<version>${{ github.event.inputs.version }}<\/version>/g' pom.xml
+        run: sed -i 's|<version>BUILD-SNAPSHOT</version>|<version>${{ github.event.inputs.version }}</version>|g' pom.xml
 
       - name: Publish package
         run: mvn --batch-mode deploy
