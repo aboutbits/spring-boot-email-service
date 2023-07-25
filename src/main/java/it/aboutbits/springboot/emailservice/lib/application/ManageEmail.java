@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.validation.annotation.Validated;
@@ -86,7 +87,7 @@ public class ManageEmail {
             email.setState(EmailState.SENT);
             email.setErrorMessage("");
             email.setSentAt(OffsetDateTime.now());
-        } catch (MessagingException | AttachmentException | IOException e) {
+        } catch (MailException | MessagingException | AttachmentException | IOException e) {
             log.error("Failed to send email: " + email.getId(), e);
             email.setErrorMessage(e.getMessage());
             email.setState(EmailState.ERROR);
@@ -165,6 +166,7 @@ public class ManageEmail {
             helper.addAttachment(attachment.getFileName(), new ByteArrayResource(payload.readAllBytes()));
             payload.close();
         }
+
 
         mailSender.send(message);
     }
