@@ -21,7 +21,7 @@ public record EmailDto(
 
         Set<EmailAttachmentDto> attachments,
 
-        OffsetDateTime sendingScheduledAt,
+        OffsetDateTime scheduledAt,
         OffsetDateTime sentAt,
 
         OffsetDateTime errorAt,

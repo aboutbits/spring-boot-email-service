@@ -25,7 +25,7 @@ class ManageEmailTest {
     @Test
     void givenRequiredParameters_schedule_shouldCreateNewNotification() {
         var parameter = EmailParameter.builder()
-                .scheduleAt(OffsetDateTime.now())
+                .scheduledAt(OffsetDateTime.now())
                 .email(EmailParameter.Email.builder()
                         .subject("Example email subject")
                         .textBody("Email body")
@@ -48,13 +48,13 @@ class ManageEmailTest {
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
         assertThat(result.attachments()).isEmpty();
-        assertThat(result.sendingScheduledAt()).isEqualTo(parameter.scheduleAt());
+        assertThat(result.scheduledAt()).isEqualTo(parameter.scheduledAt());
     }
 
     @Test
     void givenRequiredParameterWithAttachedFiles_schedule_shouldCreateNewNotification() {
         var parameter = EmailParameter.builder()
-                .scheduleAt(OffsetDateTime.now())
+                .scheduledAt(OffsetDateTime.now())
                 .email(EmailParameter.Email.builder()
                         .subject("Example email subject")
                         .textBody("Email body")
@@ -84,6 +84,6 @@ class ManageEmailTest {
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
         assertThat(result.attachments()).hasSize(1);
-        assertThat(result.sendingScheduledAt()).isEqualTo(parameter.scheduleAt());
+        assertThat(result.scheduledAt()).isEqualTo(parameter.scheduledAt());
     }
 }

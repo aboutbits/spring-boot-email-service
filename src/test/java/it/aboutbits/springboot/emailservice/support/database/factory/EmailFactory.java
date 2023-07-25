@@ -21,7 +21,7 @@ public final class EmailFactory {
                 .subject("Email subject")
                 .textBody(body)
                 .htmlBody("<h1>" + body + "</h1>")
-                .sendingScheduledAt(OffsetDateTime.now())
+                .scheduledAt(OffsetDateTime.now())
                 .fromAddress(FAKER.internet().emailAddress())
                 .fromName(FAKER.name().fullName())
                 .recipients(List.of(FAKER.internet().emailAddress(), FAKER.internet().emailAddress()));

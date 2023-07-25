@@ -13,7 +13,7 @@ import java.util.Set;
 
 @Builder
 public record EmailParameter(
-        @NonNull OffsetDateTime scheduleAt,
+        @NonNull OffsetDateTime scheduledAt,
 
         @NonNull Email email
 ) {

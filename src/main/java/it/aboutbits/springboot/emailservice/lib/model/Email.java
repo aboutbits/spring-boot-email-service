@@ -62,7 +62,7 @@ public class Email {
     @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<EmailAttachment> attachments;
 
-    private OffsetDateTime sendingScheduledAt;
+    private OffsetDateTime scheduledAt;
     private OffsetDateTime sentAt;
 
     private OffsetDateTime errorAt;

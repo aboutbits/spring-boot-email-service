@@ -50,7 +50,7 @@ public class ManageEmail {
 
         final var email = new Email();
         email.setState(EmailState.PENDING);
-        email.setSendingScheduledAt(parameter.scheduleAt());
+        email.setScheduledAt(parameter.scheduledAt());
         email.setSubject(emailData.subject());
         email.setTextBody(emailData.textBody());
         email.setHtmlBody(emailData.htmlBody());
