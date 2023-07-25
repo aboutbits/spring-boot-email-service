@@ -64,21 +64,6 @@ class QueryEmailTest {
     }
 
     @Test
-    void givenEmailNotificationWithPagination_byReference_shouldSuccess() {
-        emailRepository.saveAll(Set.of(
-                EmailFactory.once().reference("something").build(),
-                EmailFactory.once().reference("something else").build(),
-                EmailFactory.once().reference("something").build()
-        ));
-
-        var result = queryEmail.byReference(
-                "something"
-        );
-
-        assertThat(result).hasSize(2);
-    }
-
-    @Test
     void givenEmailNotification_byIds_shouldSuccess() {
         var notificationA = emailRepository.save(EmailFactory.once().build());
         var notificationB = emailRepository.save(EmailFactory.once().build());

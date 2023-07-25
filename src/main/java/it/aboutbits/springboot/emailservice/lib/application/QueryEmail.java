@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.lang.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.Collection;
@@ -52,9 +51,5 @@ public class QueryEmail {
 
     public Optional<EmailDto> byId(long id) {
         return emailRepository.findById(id).map(emailMapper::toDto);
-    }
-
-    public List<EmailDto> byReference(@Nullable String reference) {
-        return emailMapper.toDto(emailRepository.findByReference(reference));
     }
 }

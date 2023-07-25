@@ -29,7 +29,6 @@ public class EmailServiceMigrator {
                      html_body            text                                             not null,
                      attachments          jsonb                    default '[]'::jsonb,
                      sending_scheduled_at timestamp with time zone default now()           not null,
-                     reference            text,
                      sent_at              timestamp with time zone,
                      error_at             timestamp with time zone,
                      error_message        text,
@@ -38,9 +37,6 @@ public class EmailServiceMigrator {
                      constraint email_service_emails_one_body_not_empty
                          check ((text_body <> ''::text) OR (html_body <> ''::text))
                  );
-
-                 create index if not exists email_service_emails_reference_index
-                     on email_service_emails (reference);
 
                  create index if not exists email_service_emails_state_index
                      on email_service_emails (state);

@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
-import org.springframework.lang.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -16,9 +15,7 @@ import java.util.Set;
 public record EmailParameter(
         @NonNull OffsetDateTime scheduleAt,
 
-        @NonNull Email email,
-
-        @Nullable String reference
+        @NonNull Email email
 ) {
 
     @Builder

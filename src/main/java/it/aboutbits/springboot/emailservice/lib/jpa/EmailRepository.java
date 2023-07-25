@@ -13,7 +13,5 @@ import java.util.List;
 public interface EmailRepository extends JpaRepository<Email, Long> {
     Page<Email> findByState(EmailState state, PageRequest pageRequest);
 
-    List<Email> findByReference(String reference);
-
     List<Email> findByIdIn(Collection<Long> ids);
 }

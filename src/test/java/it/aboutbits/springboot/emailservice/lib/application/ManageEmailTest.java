@@ -47,7 +47,6 @@ class ManageEmailTest {
         assertThat(result.recipients()).containsAll(parameter.email().recipients());
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
-        assertThat(result.reference()).isEqualTo(parameter.reference());
         assertThat(result.attachments()).isEmpty();
         assertThat(result.sendingScheduledAt()).isEqualTo(parameter.scheduleAt());
     }
@@ -84,7 +83,6 @@ class ManageEmailTest {
         assertThat(result.recipients()).containsAll(parameter.email().recipients());
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
-        assertThat(result.reference()).isEqualTo(parameter.reference());
         assertThat(result.attachments()).hasSize(1);
         assertThat(result.sendingScheduledAt()).isEqualTo(parameter.scheduleAt());
     }

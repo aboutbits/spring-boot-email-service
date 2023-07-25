@@ -62,8 +62,6 @@ public class Email {
     @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true, fetch = FetchType.EAGER)
     private Set<EmailAttachment> attachments;
 
-    private String reference;
-
     private OffsetDateTime sendingScheduledAt;
     private OffsetDateTime sentAt;
 
