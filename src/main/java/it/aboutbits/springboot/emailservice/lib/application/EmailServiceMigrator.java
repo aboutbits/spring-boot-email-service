@@ -44,7 +44,7 @@ public class EmailServiceMigrator {
 
                  create index if not exists email_service_emails_scheduled_at_index
                      on email_service_emails (scheduled_at);
-                     
+
                  create index if not exists email_service_emails_attachments_cleaned_index
                      on email_service_emails (attachments_cleaned);
 
@@ -57,7 +57,7 @@ public class EmailServiceMigrator {
                              references email_service_emails,
                      file_name    text   not null,
                      content_type text   not null,
-                     reference    text   not null
+                     file_reference    bigint   not null
                  );
 
                  create index if not exists email_service_email_attachments_email_id_index

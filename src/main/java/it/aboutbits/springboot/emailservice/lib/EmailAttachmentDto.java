@@ -11,6 +11,6 @@ public record EmailAttachmentDto(
 
         String contentType,
 
-        AttachmentReference reference
+        long fileReference
 ) {
 }

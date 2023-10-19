@@ -5,7 +5,6 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -27,6 +26,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 
+import static it.aboutbits.springboot.emailservice.lib.model.Email.DEFAULT_ENTITY_GRAPH;
+
 @NamedEntityGraph(
         name = "email_service_emails-entity-graph",
         attributeNodes = {
@@ -40,7 +41,10 @@ import java.util.Set;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "email_service_emails")
+@NamedEntityGraph(name = DEFAULT_ENTITY_GRAPH, attributeNodes = @NamedAttributeNode("attachments"))
 public class Email {
+    public static final String DEFAULT_ENTITY_GRAPH = "graph.EmailServiceEmail.default";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -59,7 +63,7 @@ public class Email {
     private String textBody;
     private String htmlBody;
 
-    @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true)
     private Set<EmailAttachment> attachments;
 
     @Builder.Default

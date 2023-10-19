@@ -1,7 +1,6 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
-import it.aboutbits.springboot.emailservice.lib.AttachmentReference;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
@@ -21,6 +20,7 @@ import java.time.OffsetDateTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -58,7 +58,7 @@ class ManageEmailTest {
 
     @Test
     void givenRequiredParameterWithAttachedFiles_schedule_shouldCreateNewNotification() throws EmailException, AttachmentException {
-        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(new AttachmentReference("ref"));
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
 
         var parameter = getValidParameterWithAttachment();
 
@@ -96,8 +96,8 @@ class ManageEmailTest {
 
     @Test
     void givenRequiredParameterWithAttachedFiles_sendOrFail_shouldCreateNewNotification() throws EmailException, AttachmentException {
-        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(new AttachmentReference("ref"));
-        when(attachmentDataSource.getAttachmentPayload(any())).thenReturn(new ByteArrayInputStream(new byte[0]));
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
+        when(attachmentDataSource.getAttachmentPayload(anyLong())).thenReturn(new ByteArrayInputStream(new byte[0]));
 
         var parameter = getValidParameterWithAttachment();
 
@@ -126,8 +126,8 @@ class ManageEmailTest {
 
     @Test
     void givenRequiredParameterWithAttachedFiles_sendOrFail_shouldSendImmediately() throws EmailException, AttachmentException {
-        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(new AttachmentReference("ref"));
-        when(attachmentDataSource.getAttachmentPayload(any())).thenReturn(new ByteArrayInputStream(new byte[0]));
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
+        when(attachmentDataSource.getAttachmentPayload(anyLong())).thenReturn(new ByteArrayInputStream(new byte[0]));
 
         var parameter = getValidParameterWithAttachment();
 
@@ -149,8 +149,8 @@ class ManageEmailTest {
 
     @Test
     void givenMailSenderError_sendOrFail_shouldFail() throws EmailException, AttachmentException {
-        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(new AttachmentReference("ref"));
-        when(attachmentDataSource.getAttachmentPayload(any())).thenReturn(new ByteArrayInputStream(new byte[0]));
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
+        when(attachmentDataSource.getAttachmentPayload(anyLong())).thenReturn(new ByteArrayInputStream(new byte[0]));
 
         doThrow(new MailSendException("any")).when(javaMailSender).send(any(MimeMessage.class));
 
