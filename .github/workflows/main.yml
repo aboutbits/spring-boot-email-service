@@ -1,0 +1,43 @@
+name: Publish package to GitHub Packages
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version name to publish (eg: x.x.x)"
+        type: string
+        required: true
+
+jobs:
+  publish:
+    timeout-minutes: 15
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: aboutbits/github-actions-java/setup-and-install@v1
+
+      - name: Set Version
+        run: sed -i 's|<version>BUILD-SNAPSHOT</version>|<version>${{ github.event.inputs.version }}</version>|g' pom.xml
+
+      - name: Publish package
+        run: mvn --batch-mode deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tag:
+    timeout-minutes: 5
+    runs-on: ubuntu-22.04
+    needs: publish
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Tag Deployment
+        uses: aboutbits/github-actions-base/git-create-or-update-tag@v1
+        with:
+          tag-name: ${{ github.event.inputs.version }}
+          user-name: 'AboutBits'
+          user-email: 'info@aboutbits.it'

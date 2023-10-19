@@ -1,0 +1,14 @@
+spring:
+  mail:
+    default-encoding: UTF-8
+    host: ${MAIL_HOST:localhost}
+    username: ${MAIL_USERNAME:null}
+    password: ${MAIL_PASSWORD:null}
+    port: ${MAIL_PORT:1025}
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SSL:false}
+          starttls:
+            enable: ${MAIL_SSL:false}
