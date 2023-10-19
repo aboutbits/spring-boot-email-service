@@ -6,6 +6,7 @@ import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import jakarta.mail.internet.MimeMessage;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -37,6 +39,11 @@ class ManageEmailTest {
 
     @Autowired
     private ManageEmail manageEmail;
+
+    @BeforeEach
+    void setup() {
+        doNothing().when(javaMailSender).send(any(MimeMessage.class));
+    }
 
     @Test
     void givenRequiredParameters_schedule_shouldCreateNewNotification() throws EmailException {
