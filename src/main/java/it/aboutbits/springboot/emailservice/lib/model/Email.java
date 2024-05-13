@@ -21,6 +21,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
+import org.springframework.lang.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -56,6 +57,11 @@ public class Email {
 
     private String fromAddress;
     private String fromName;
+
+    @Nullable
+    private String replyToAddress;
+    @Nullable
+    private String replyToName;
 
     @JdbcTypeCode(SqlTypes.JSON)
     private List<String> recipients;

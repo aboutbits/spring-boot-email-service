@@ -24,6 +24,8 @@ public final class EmailFactory {
                 .scheduledAt(OffsetDateTime.now())
                 .fromAddress(FAKER.internet().emailAddress())
                 .fromName(FAKER.name().fullName())
+                .replyToAddress(FAKER.internet().emailAddress())
+                .replyToName(FAKER.name().fullName())
                 .recipients(List.of(FAKER.internet().emailAddress(), FAKER.internet().emailAddress()));
     }
 }

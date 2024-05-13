@@ -56,6 +56,8 @@ class ManageEmailTest {
         assertThat(result.subject()).isEqualTo(parameter.email().subject());
         assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
         assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
         assertThat(result.recipients()).containsAll(parameter.email().recipients());
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
@@ -76,6 +78,8 @@ class ManageEmailTest {
         assertThat(result.subject()).isEqualTo(parameter.email().subject());
         assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
         assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
         assertThat(result.recipients()).containsAll(parameter.email().recipients());
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
@@ -94,6 +98,8 @@ class ManageEmailTest {
         assertThat(result.subject()).isEqualTo(parameter.email().subject());
         assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
         assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
         assertThat(result.recipients()).containsAll(parameter.email().recipients());
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
@@ -115,6 +121,8 @@ class ManageEmailTest {
         assertThat(result.subject()).isEqualTo(parameter.email().subject());
         assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
         assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
         assertThat(result.recipients()).containsAll(parameter.email().recipients());
         assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
         assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
@@ -179,6 +187,8 @@ class ManageEmailTest {
                         .recipient("person2@example.com")
                         .fromAddress("somebody@aboutbits.it")
                         .fromName("somebody")
+                        .replyToAddress("somebodyElse@aboutbits.it")
+                        .replyToName("somebodyElse")
                         .build()
                 ).build();
     }
@@ -201,6 +211,8 @@ class ManageEmailTest {
                         )
                         .fromAddress("somebody@aboutbits.it")
                         .fromName("somebody")
+                        .replyToAddress("somebodyElse@aboutbits.it")
+                        .replyToName("somebodyElse")
                         .build()
                 ).build();
     }

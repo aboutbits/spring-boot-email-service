@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
 import lombok.NonNull;
 import lombok.Singular;
+import org.springframework.lang.Nullable;
 
 import java.io.InputStream;
 import java.time.OffsetDateTime;
@@ -39,6 +40,11 @@ public record EmailParameter(
             @NonNull
             @NotBlank
             String fromName,
+
+            @Nullable
+            String replyToAddress,
+            @Nullable
+            String replyToName,
 
             @Singular
             @NonNull
