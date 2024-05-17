@@ -14,7 +14,9 @@ public class EmailServiceMigrator {
     void migrate() {
         log.info("EmailService: running DB migrations...");
 
-        jdbcTemplate.execute("""
+        jdbcTemplate.execute(
+                //@formatter:off
+                """
 
                  create table if not exists email_service_emails
                  (
@@ -63,7 +65,11 @@ public class EmailServiceMigrator {
                  create index if not exists email_service_email_attachments_email_id_index
                      on email_service_email_attachments (email_id);
 
-                """);
+                 alter table email_service_emails add column if not exists reply_to_address text;
+                 alter table email_service_emails add column if not exists reply_to_name text;
+                """
+                //@formatter:on
+        );
 
         log.info("EmailService: migrations done!");
     }

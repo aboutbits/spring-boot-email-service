@@ -1,5 +1,7 @@
 package it.aboutbits.springboot.emailservice.lib;
 
+import org.springframework.lang.Nullable;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
@@ -13,6 +15,11 @@ public record EmailDto(
 
         String fromAddress,
         String fromName,
+
+        @Nullable
+        String replyToAddress,
+        @Nullable
+        String replyToName,
 
         List<String> recipients,
 

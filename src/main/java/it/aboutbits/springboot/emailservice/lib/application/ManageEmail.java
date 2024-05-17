@@ -14,6 +14,7 @@ import jakarta.validation.Valid;
 import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.lang.Nullable;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -38,7 +39,8 @@ public class ManageEmail {
             EmailRepository emailRepository,
             JavaMailSender mailSender,
             AttachmentDataSource attachmentDataSource,
-            final EmailMapper emailMapper) {
+            final EmailMapper emailMapper
+    ) {
 
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
@@ -115,6 +117,8 @@ public class ManageEmail {
         email.setRecipients(emailData.recipients());
         email.setFromAddress(emailData.fromAddress());
         email.setFromName(emailData.fromName());
+        email.setReplyToAddress(emailData.replyToAddress());
+        email.setReplyToName(emailData.replyToName());
 
         var attachments = new HashSet<EmailAttachment>();
         for (var attachment : parameter.email().attachments()) {
@@ -134,25 +138,48 @@ public class ManageEmail {
         return email;
     }
 
-    private void sendMail(Email notification) throws MessagingException, IOException, AttachmentException {
+    private void sendMail(Email email) throws MessagingException, IOException, AttachmentException {
         sendMail(
-                notification.getFromAddress(),
-                notification.getFromName(),
-                notification.getRecipients(),
-                notification.getSubject(),
-                notification.getHtmlBody(),
-                notification.getTextBody(),
-                notification.getAttachments()
+                email.getFromAddress(),
+                email.getFromName(),
+                email.getReplyToAddress(),
+                email.getReplyToName(),
+                email.getRecipients(),
+                email.getSubject(),
+                email.getHtmlBody(),
+                email.getTextBody(),
+                email.getAttachments()
         );
     }
 
-    private void sendMail(String fromAddress, String fromName, List<String> recipients, String subject, String htmlBody, String plainTextBody, Set<EmailAttachment> attachments) throws MessagingException, IOException, AttachmentException {
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    private void sendMail(
+            String fromAddress,
+            String fromName,
+            @Nullable
+            String replyToAddress,
+            @Nullable
+            String replyToName,
+            List<String> recipients,
+            String subject,
+            String htmlBody,
+            String plainTextBody,
+            Set<EmailAttachment> attachments
+    ) throws MessagingException, IOException, AttachmentException {
         var message = mailSender.createMimeMessage();
         var helper = new MimeMessageHelper(message, true, "UTF-8");
 
         helper.setFrom(fromAddress, fromName);
         helper.setTo(recipients.toArray(String[]::new));
         helper.setSubject(subject);
+
+        if (replyToAddress != null) {
+            if (replyToName != null) {
+                helper.setReplyTo(replyToAddress, replyToName);
+            } else {
+                helper.setReplyTo(replyToAddress);
+            }
+        }
 
         if (!htmlBody.isBlank()) {
             helper.setText(plainTextBody, htmlBody);
