@@ -1,0 +1,23 @@
+<component name="ProjectCodeStyleConfiguration">
+  <code_scheme name="Project" version="173">
+    <JavaCodeStyleSettings>
+      <option name="CLASS_COUNT_TO_USE_IMPORT_ON_DEMAND" value="999" />
+      <option name="NAMES_COUNT_TO_USE_IMPORT_ON_DEMAND" value="999" />
+      <option name="MULTI_CATCH_TYPES_WRAP" value="0" />
+    </JavaCodeStyleSettings>
+    <codeStyleSettings language="JAVA">
+      <option name="ALIGN_MULTILINE_PARAMETERS_IN_CALLS" value="true" />
+      <option name="CALL_PARAMETERS_WRAP" value="5" />
+      <option name="PREFER_PARAMETERS_WRAP" value="true" />
+      <option name="CALL_PARAMETERS_LPAREN_ON_NEXT_LINE" value="true" />
+      <option name="CALL_PARAMETERS_RPAREN_ON_NEXT_LINE" value="true" />
+      <option name="METHOD_PARAMETERS_WRAP" value="5" />
+      <option name="METHOD_PARAMETERS_LPAREN_ON_NEXT_LINE" value="true" />
+      <option name="METHOD_PARAMETERS_RPAREN_ON_NEXT_LINE" value="true" />
+      <option name="METHOD_CALL_CHAIN_WRAP" value="5" />
+      <option name="TERNARY_OPERATION_WRAP" value="5" />
+      <option name="TERNARY_OPERATION_SIGNS_ON_NEXT_LINE" value="true" />
+      <option name="KEEP_BUILDER_METHODS_INDENTS" value="true" />
+    </codeStyleSettings>
+  </code_scheme>
+</component>
