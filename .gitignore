@@ -14,10 +14,19 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
-*.iws
+# Reference: https://intellij-support.jetbrains.com/hc/en-us/articles/206544839
+.idea/*
+!.idea/codeStyles
+!.idea/.gitignore
+!.idea/checkstyle-idea.xml
+!.idea/encodings.xml
+!.idea/misc.xml
+!.idea/sqldialects.xml
+!.idea/vcs.xml
+
 *.iml
 *.ipr
+*.iws
 
 ### NetBeans ###
 /nbproject/private/
