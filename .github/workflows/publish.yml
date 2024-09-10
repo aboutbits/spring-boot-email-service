@@ -18,15 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: aboutbits/github-actions-java/setup-and-install@v3
+      - uses: aboutbits/github-actions-java/setup@v3
 
       - name: Set Version
         run: sed -i 's|<version>BUILD-SNAPSHOT</version>|<version>${{ github.event.inputs.version }}</version>|g' pom.xml
 
       - name: Publish package
-        run: mvn --batch-mode deploy
+        run: mvn -s $GITHUB_WORKSPACE/.github/workflows/maven-settings.xml --batch-mode deploy
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_USER_NAME: ${{ github.actor }}
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   tag:
     timeout-minutes: 5
