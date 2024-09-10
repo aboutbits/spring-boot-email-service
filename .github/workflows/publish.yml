@@ -24,7 +24,7 @@ jobs:
         run: sed -i 's|<version>BUILD-SNAPSHOT</version>|<version>${{ github.event.inputs.version }}</version>|g' pom.xml
 
       - name: Publish package
-        run: mvn --batch-mode deploy
+        run: mvn -s $GITHUB_WORKSPACE/.github/workflows/maven-settings.xml --batch-mode deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
