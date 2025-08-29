@@ -1,44 +1,43 @@
-name: Publish package to GitHub Packages
+name: Release Package
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version name to publish (eg: x.x.x)"
+        description: "Version (eg: x.x.x)"
         type: string
         required: true
 
 jobs:
-  publish:
+  build-and-publish:
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
-    runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
-
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: aboutbits/github-actions-java/setup@v3
-
-      - name: Set Version
-        run: sed -i 's|<version>BUILD-SNAPSHOT</version>|<version>${{ github.event.inputs.version }}</version>|g' pom.xml
-
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
+      - uses: aboutbits/github-actions-base/git-setup@v2
+      - uses: aboutbits/github-actions-java/setup-with-maven@v4
+        with:
+          java-version: 21
+      - uses: aboutbits/github-actions-java/set-version-with-maven@v4
+        with:
+          version: "${{ github.event.inputs.version }}"
       - name: Publish package
-        run: mvn -s $GITHUB_WORKSPACE/.github/workflows/maven-settings.xml --batch-mode deploy
         env:
           GITHUB_USER_NAME: ${{ github.actor }}
           GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  tag:
-    timeout-minutes: 5
-    runs-on: ubuntu-22.04
-    needs: publish
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Tag Deployment
-        uses: aboutbits/github-actions-base/git-create-or-update-tag@v1
+        run: mvn -s $GITHUB_WORKSPACE/.github/workflows/maven-settings.xml --batch-mode deploy
+        shell: bash
+      - uses: aboutbits/github-actions-base/git-commit-and-push-all@v2
         with:
-          tag-name: ${{ github.event.inputs.version }}
-          user-name: 'AboutBits'
-          user-email: 'info@aboutbits.it'
+          message: '${{ github.event.inputs.version }}'
+      - uses: aboutbits/github-actions-base/git-create-or-update-tag@v2
+        with:
+          tag-name: 'v${{ github.event.inputs.version }}'
+      - uses: aboutbits/github-actions-base/github-create-release@v2
+        with:
+          tag-name: 'v${{ github.event.inputs.version }}'
