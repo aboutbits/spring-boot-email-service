@@ -40,4 +40,4 @@ jobs:
           tag-name: 'v${{ github.event.inputs.version }}'
       - uses: aboutbits/github-actions-base/github-create-release@v2
         with:
-          tag-name: 'v${{ github.event.inputs.version }}'
+          tag-name: '${{ github.event.inputs.version }}'
