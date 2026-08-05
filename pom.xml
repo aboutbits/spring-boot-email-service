@@ -16,7 +16,7 @@
     <description>Spring Boot Email Service</description>
 
     <properties>
-        <java.version>26</java.version>
+        <java.version>25</java.version>
         <mapstruct.version>1.6.3</mapstruct.version>
     </properties>
 

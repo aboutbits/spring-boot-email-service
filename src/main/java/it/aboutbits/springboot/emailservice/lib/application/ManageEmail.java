@@ -11,10 +11,9 @@ import it.aboutbits.springboot.emailservice.lib.model.Email;
 import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
-import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -48,7 +47,7 @@ public class ManageEmail {
         this.emailMapper = emailMapper;
     }
 
-    public EmailDto schedule(@NonNull @Valid EmailParameter parameter) throws EmailException {
+    public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
             email = fromParameter(parameter);
@@ -61,7 +60,7 @@ public class ManageEmail {
         return emailMapper.toDto(savedEmail);
     }
 
-    public EmailDto sendOrFail(@NonNull @Valid EmailParameter parameter) throws EmailException {
+    public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
             email = fromParameter(parameter);

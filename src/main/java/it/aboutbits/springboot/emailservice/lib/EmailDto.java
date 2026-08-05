@@ -1,6 +1,6 @@
 package it.aboutbits.springboot.emailservice.lib;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.List;

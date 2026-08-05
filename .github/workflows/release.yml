@@ -19,7 +19,7 @@ jobs:
       - uses: aboutbits/github-actions-base/git-setup@v2
       - uses: aboutbits/github-actions-java/setup-with-maven@v4
         with:
-          java-version: 26
+          java-version: 25
       - uses: aboutbits/github-actions-java/set-version-with-maven@v4
         with:
           version: "${{ github.event.inputs.version }}"
