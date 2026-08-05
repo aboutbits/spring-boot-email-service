@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           token: ${{ secrets.GH_PERSONAL_ACCESS_TOKEN }}
       - uses: aboutbits/github-actions-base/git-setup@v2
       - uses: aboutbits/github-actions-java/setup-with-maven@v4
         with:
-          java-version: 21
+          java-version: 26
       - uses: aboutbits/github-actions-java/set-version-with-maven@v4
         with:
           version: "${{ github.event.inputs.version }}"

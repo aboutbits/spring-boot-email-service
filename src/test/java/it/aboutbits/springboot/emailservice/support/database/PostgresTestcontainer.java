@@ -101,7 +101,7 @@ public class PostgresTestcontainer implements BeforeAllCallback, AfterEachCallba
     }
 
     @Data
-    private static class TableData {
+    private static final class TableData {
         private final String schema;
         private final String name;
 

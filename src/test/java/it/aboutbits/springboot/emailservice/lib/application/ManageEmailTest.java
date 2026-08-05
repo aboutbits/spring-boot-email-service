@@ -10,10 +10,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.io.ByteArrayInputStream;
 import java.time.OffsetDateTime;
@@ -31,10 +31,10 @@ import static org.mockito.Mockito.when;
 @SpringBootTest
 @WithPostgres
 class ManageEmailTest {
-    @SpyBean
+    @MockitoSpyBean
     JavaMailSender javaMailSender;
 
-    @MockBean
+    @MockitoBean
     AttachmentDataSource attachmentDataSource;
 
     @Autowired

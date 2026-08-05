@@ -1,8 +1,8 @@
 package it.aboutbits.springboot.emailservice.support.database.factory;
 
-import com.github.javafaker.Faker;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
+import net.datafaker.Faker;
 
 import java.time.OffsetDateTime;
 import java.util.List;
