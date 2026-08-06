@@ -5,6 +5,7 @@ import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import it.aboutbits.springboot.emailservice.support.database.factory.EmailFactory;
+import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @WithPostgres
+@NullMarked
 class QueryEmailTest {
     @MockitoBean
     JavaMailSender javaMailSender;

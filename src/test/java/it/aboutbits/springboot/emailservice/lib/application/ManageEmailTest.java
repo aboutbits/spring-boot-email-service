@@ -6,6 +6,7 @@ import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import jakarta.mail.internet.MimeMessage;
+import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @WithPostgres
+@NullMarked
 class ManageEmailTest {
     @MockitoSpyBean
     JavaMailSender javaMailSender;
