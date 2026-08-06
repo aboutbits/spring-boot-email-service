@@ -1,5 +1,8 @@
 package it.aboutbits.springboot.emailservice.lib.exception;
 
+import org.jspecify.annotations.NullUnmarked;
+
+@NullUnmarked
 public class EmailException extends Exception {
     public EmailException() {
         super();

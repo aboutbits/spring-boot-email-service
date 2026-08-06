@@ -12,8 +12,9 @@ import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ByteArrayResource;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -28,6 +29,7 @@ import java.util.Set;
 
 @Validated
 @Slf4j
+@NullMarked
 public class ManageEmail {
     private final EmailRepository emailRepository;
     private final JavaMailSender mailSender;
@@ -40,7 +42,6 @@ public class ManageEmail {
             AttachmentDataSource attachmentDataSource,
             final EmailMapper emailMapper
     ) {
-
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
         this.attachmentDataSource = attachmentDataSource;

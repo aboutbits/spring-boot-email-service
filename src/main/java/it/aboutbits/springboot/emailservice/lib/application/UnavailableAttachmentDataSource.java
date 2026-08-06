@@ -2,9 +2,11 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
+import org.jspecify.annotations.NullMarked;
 
 import java.io.InputStream;
 
+@NullMarked
 public final class UnavailableAttachmentDataSource implements AttachmentDataSource {
     @Override
     public InputStream getAttachmentPayload(long fileReference) throws AttachmentException {

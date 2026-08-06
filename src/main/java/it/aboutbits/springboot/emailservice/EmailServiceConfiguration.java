@@ -15,6 +15,7 @@ import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
 import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import jakarta.persistence.EntityManager;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,6 +26,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import java.util.List;
 
 @AutoConfigurationPackage
+@NullMarked
 public class EmailServiceConfiguration {
     @Bean(initMethod = "migrate")
     @ConditionalOnProperty(value = "aboutbits.emailservice.migrations.enabled", matchIfMissing = true)

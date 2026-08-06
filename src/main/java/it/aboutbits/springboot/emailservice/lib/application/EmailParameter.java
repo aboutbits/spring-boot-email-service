@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Builder;
 import lombok.Singular;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
@@ -12,11 +13,11 @@ import java.util.List;
 import java.util.Set;
 
 @Builder
+@NullMarked
 public record EmailParameter(
         OffsetDateTime scheduledAt,
         Email email
 ) {
-
     @Builder
     public record Email(
             @NotBlank

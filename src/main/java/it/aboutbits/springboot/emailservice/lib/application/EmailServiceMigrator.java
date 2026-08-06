@@ -1,9 +1,11 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @Slf4j
+@NullMarked
 public class EmailServiceMigrator {
     private final JdbcTemplate jdbcTemplate;
 

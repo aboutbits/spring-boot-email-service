@@ -1,5 +1,8 @@
 package it.aboutbits.springboot.emailservice.lib.exception;
 
+import org.jspecify.annotations.NullUnmarked;
+
+@NullUnmarked
 public class AttachmentException extends Exception {
     public AttachmentException() {
         super();
@@ -17,7 +20,12 @@ public class AttachmentException extends Exception {
         super(cause);
     }
 
-    protected AttachmentException(final String message, final Throwable cause, final boolean enableSuppression, final boolean writableStackTrace) {
+    protected AttachmentException(
+            final String message,
+            final Throwable cause,
+            final boolean enableSuppression,
+            final boolean writableStackTrace
+    ) {
         super(message, cause, enableSuppression, writableStackTrace);
     }
 }

@@ -5,6 +5,7 @@ import it.aboutbits.springboot.emailservice.lib.AttachmentCleanerCallback;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Duration;
@@ -12,6 +13,7 @@ import java.util.List;
 
 @RequiredArgsConstructor
 @Log4j2
+@NullMarked
 public class CleanupAttachmentFiles {
     private static final String JOB_DESCRIPTION = "Cleanup attachments of sent Emails.";
 

@@ -1,7 +1,9 @@
 package it.aboutbits.springboot.emailservice.lib;
 
 import it.aboutbits.springboot.emailservice.lib.model.Email;
+import org.jspecify.annotations.NullMarked;
 
+@NullMarked
 public record EmailAttachmentDto(
         long id,
 
