@@ -72,7 +72,8 @@ public class ManageEmail {
         var savedEmail = send(email);
 
         if (savedEmail.hasFailed()) {
-            throw new EmailException(savedEmail.getErrorMessage());
+            var errorMessage = savedEmail.getErrorMessage();
+            throw new EmailException(errorMessage != null ? errorMessage : "");
         }
 
         return emailMapper.toDto(savedEmail);

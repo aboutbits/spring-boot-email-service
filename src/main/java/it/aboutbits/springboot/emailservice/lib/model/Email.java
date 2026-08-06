@@ -22,6 +22,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -59,7 +60,9 @@ public class Email {
     private String fromAddress;
     private String fromName;
 
+    @Nullable
     private String replyToAddress;
+    @Nullable
     private String replyToName;
 
     @JdbcTypeCode(SqlTypes.JSON)
@@ -75,9 +78,12 @@ public class Email {
     private boolean attachmentsCleaned = false;
 
     private OffsetDateTime scheduledAt;
+    @Nullable
     private OffsetDateTime sentAt;
 
+    @Nullable
     private OffsetDateTime errorAt;
+    @Nullable
     private String errorMessage;
 
     @CreationTimestamp
