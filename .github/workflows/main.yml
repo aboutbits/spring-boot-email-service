@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: aboutbits/github-actions-java/setup-with-maven@v4
         with:
-          java-version: 21
+          java-version: 25
       - name: Test
         env:
           GITHUB_USER_NAME: ${{ github.actor }}

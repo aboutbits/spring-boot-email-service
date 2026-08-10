@@ -4,6 +4,7 @@ package it.aboutbits.springboot.emailservice.lib.application;
 import it.aboutbits.springboot.emailservice.lib.EmailSchedulerCallback;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Duration;
@@ -11,6 +12,7 @@ import java.util.List;
 
 @RequiredArgsConstructor
 @Log4j2
+@NullMarked
 public class SendScheduledEmails {
     private static final String JOB_DESCRIPTION = "Sending open and failed email notifications.";
 

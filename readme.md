@@ -4,7 +4,7 @@ A reusable mailer service to send emails.
 
 ## Setup
 
-Add the mailer service to the classpath by adding the following maven dependency. Versions haven be found [here](../../packages)
+Add the mailer service to the classpath by adding the following maven dependency. Versions can be found [here](../../packages)
 
 ```xml
 

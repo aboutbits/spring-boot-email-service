@@ -1,11 +1,13 @@
 package it.aboutbits.springboot.emailservice.lib;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 
+@NullMarked
 public record EmailDto(
         long id,
 
@@ -29,9 +31,12 @@ public record EmailDto(
         Set<EmailAttachmentDto> attachments,
 
         OffsetDateTime scheduledAt,
+        @Nullable
         OffsetDateTime sentAt,
 
+        @Nullable
         OffsetDateTime errorAt,
+        @Nullable
         String errorMessage,
 
         OffsetDateTime createdAt,

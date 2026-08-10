@@ -2,6 +2,9 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.NullUnmarked;
+import org.mapstruct.AnnotateWith;
 import org.mapstruct.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -9,6 +12,8 @@ import org.springframework.data.domain.PageImpl;
 import java.util.List;
 
 @Mapper(uses = EmailAttachmentMapper.class)
+@AnnotateWith(NullUnmarked.class)
+@NullMarked
 public interface EmailMapper {
     EmailDto toDto(Email model);
 

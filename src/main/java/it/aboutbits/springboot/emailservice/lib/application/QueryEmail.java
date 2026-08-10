@@ -7,6 +7,7 @@ import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -18,13 +19,18 @@ import java.util.List;
 import java.util.Optional;
 
 @RequiredArgsConstructor
+@NullMarked
 public class QueryEmail {
     private final EmailRepository emailRepository;
     private final EmailMapper emailMapper;
     private final EntityManager entityManager;
 
     public Page<EmailDto> paginatedByState(EmailState state, PageRequest pageParameter) {
-        var pageRequest = PageRequest.of(pageParameter.getPageNumber(), pageParameter.getPageSize(), Sort.by("updatedAt"));
+        var pageRequest = PageRequest.of(
+                pageParameter.getPageNumber(),
+                pageParameter.getPageSize(),
+                Sort.by("updatedAt")
+        );
 
         return emailMapper.toDto(emailRepository.findByState(state, pageRequest));
     }
@@ -38,12 +44,14 @@ public class QueryEmail {
 
     List<Email> readyToSend() {
         var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
-        return entityManager.createQuery("""
-                        SELECT e from Email e WHERE e.scheduledAt < :scheduledBefore AND e.state IN (
-                            it.aboutbits.springboot.emailservice.lib.EmailState.PENDING,
-                            it.aboutbits.springboot.emailservice.lib.EmailState.ERROR
-                        )
-                        """, Email.class)
+        return entityManager.createQuery(
+                        """
+                                SELECT e from Email e WHERE e.scheduledAt < :scheduledBefore AND e.state IN (
+                                    it.aboutbits.springboot.emailservice.lib.EmailState.PENDING,
+                                    it.aboutbits.springboot.emailservice.lib.EmailState.ERROR
+                                )
+                                """, Email.class
+                )
                 .setParameter("scheduledBefore", OffsetDateTime.now())
                 .setHint("jakarta.persistence.fetchgraph", entityGraph)
                 .getResultList();
@@ -51,9 +59,11 @@ public class QueryEmail {
 
     List<Email> readyToCleanup() {
         var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
-        return entityManager.createQuery("""
-                        SELECT e from Email e WHERE e.attachmentsCleaned=false AND e.state=it.aboutbits.springboot.emailservice.lib.EmailState.SENT
-                        """, Email.class)
+        return entityManager.createQuery(
+                        """
+                                SELECT e from Email e WHERE e.attachmentsCleaned=false AND e.state=it.aboutbits.springboot.emailservice.lib.EmailState.SENT
+                                """, Email.class
+                )
                 .setHint("jakarta.persistence.fetchgraph", entityGraph)
                 .getResultList();
     }

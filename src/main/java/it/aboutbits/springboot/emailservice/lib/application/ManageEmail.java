@@ -11,10 +11,10 @@ import it.aboutbits.springboot.emailservice.lib.model.Email;
 import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
-import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.lang.Nullable;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -29,6 +29,7 @@ import java.util.Set;
 
 @Validated
 @Slf4j
+@NullMarked
 public class ManageEmail {
     private final EmailRepository emailRepository;
     private final JavaMailSender mailSender;
@@ -41,14 +42,13 @@ public class ManageEmail {
             AttachmentDataSource attachmentDataSource,
             final EmailMapper emailMapper
     ) {
-
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
         this.attachmentDataSource = attachmentDataSource;
         this.emailMapper = emailMapper;
     }
 
-    public EmailDto schedule(@NonNull @Valid EmailParameter parameter) throws EmailException {
+    public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
             email = fromParameter(parameter);
@@ -61,7 +61,7 @@ public class ManageEmail {
         return emailMapper.toDto(savedEmail);
     }
 
-    public EmailDto sendOrFail(@NonNull @Valid EmailParameter parameter) throws EmailException {
+    public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
             email = fromParameter(parameter);
@@ -72,7 +72,8 @@ public class ManageEmail {
         var savedEmail = send(email);
 
         if (savedEmail.hasFailed()) {
-            throw new EmailException(savedEmail.getErrorMessage());
+            throw new EmailException("Failed to send email [id=%s, providerMessage=%s]"
+                                             .formatted(savedEmail.getId(), savedEmail.getErrorMessage()));
         }
 
         return emailMapper.toDto(savedEmail);

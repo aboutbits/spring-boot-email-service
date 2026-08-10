@@ -9,11 +9,13 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.jspecify.annotations.NullUnmarked;
 
 @Entity
 @Getter
 @Setter
 @Table(name = "email_service_email_attachments")
+@NullUnmarked
 public class EmailAttachment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

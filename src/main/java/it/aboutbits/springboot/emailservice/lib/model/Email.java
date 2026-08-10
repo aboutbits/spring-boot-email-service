@@ -21,7 +21,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -43,6 +44,7 @@ import static it.aboutbits.springboot.emailservice.lib.model.Email.DEFAULT_ENTIT
 @NoArgsConstructor
 @Table(name = "email_service_emails")
 @NamedEntityGraph(name = DEFAULT_ENTITY_GRAPH, attributeNodes = @NamedAttributeNode("attachments"))
+@NullUnmarked
 public class Email {
     public static final String DEFAULT_ENTITY_GRAPH = "graph.EmailServiceEmail.default";
 
@@ -76,9 +78,12 @@ public class Email {
     private boolean attachmentsCleaned = false;
 
     private OffsetDateTime scheduledAt;
+    @Nullable
     private OffsetDateTime sentAt;
 
+    @Nullable
     private OffsetDateTime errorAt;
+    @Nullable
     private String errorMessage;
 
     @CreationTimestamp

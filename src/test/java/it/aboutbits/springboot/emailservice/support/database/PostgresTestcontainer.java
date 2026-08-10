@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.support.database;
 
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -17,6 +18,7 @@ import java.util.Set;
 import java.util.StringJoiner;
 
 @Log4j2
+@NullMarked
 public class PostgresTestcontainer implements BeforeAllCallback, AfterEachCallback {
     public static final PostgreSQLContainer<?> POSTGRES_CONTAINER;
     private static final Set<String> TABLES_TO_IGNORE = Set.of(
@@ -101,7 +103,7 @@ public class PostgresTestcontainer implements BeforeAllCallback, AfterEachCallba
     }
 
     @Data
-    private static class TableData {
+    private static final class TableData {
         private final String schema;
         private final String name;
 
