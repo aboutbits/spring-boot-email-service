@@ -18,6 +18,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
@@ -31,6 +32,18 @@ import java.util.Set;
 @Slf4j
 @NullMarked
 public class ManageEmail {
+    record SendBatchOutcome(int sent, int errors) {
+        int total() {
+            return sent + errors;
+        }
+    }
+
+    record CleanupBatchOutcome(int cleaned, int errors) {
+        int total() {
+            return cleaned + errors;
+        }
+    }
+
     private final EmailRepository emailRepository;
     private final JavaMailSender mailSender;
     private final AttachmentDataSource attachmentDataSource;
@@ -40,7 +53,7 @@ public class ManageEmail {
             EmailRepository emailRepository,
             JavaMailSender mailSender,
             AttachmentDataSource attachmentDataSource,
-            final EmailMapper emailMapper
+            EmailMapper emailMapper
     ) {
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
@@ -77,6 +90,54 @@ public class ManageEmail {
         }
 
         return emailMapper.toDto(savedEmail);
+    }
+
+    // Sends the emails identified by the given ids and persists SENT/ERROR state for each
+    @Transactional
+    SendBatchOutcome sendBatch(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return new SendBatchOutcome(0, 0);
+        }
+        var emails = emailRepository.findByIdIn(ids);
+        var sent = 0;
+        var errors = 0;
+        for (var email : emails) {
+            try {
+                var updated = send(email);
+                if (updated.hasFailed()) {
+                    errors++;
+                } else {
+                    sent++;
+                }
+            } catch (RuntimeException e) {
+                // A single misbehaving email should not roll back the whole batch's committed state
+                // (which would risk duplicate delivery for siblings that already left the SMTP relay).
+                log.error("Unexpected failure while sending email: {}", email.getId(), e);
+                errors++;
+            }
+        }
+        return new SendBatchOutcome(sent, errors);
+    }
+
+    // Releases attachment payloads for the given emails and marks them cleaned
+    @Transactional
+    CleanupBatchOutcome cleanupBatch(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return new CleanupBatchOutcome(0, 0);
+        }
+        var emails = emailRepository.findByIdIn(ids);
+        var cleaned = 0;
+        var errors = 0;
+        for (var email : emails) {
+            try {
+                cleanupAttachments(email);
+                cleaned++;
+            } catch (AttachmentException | RuntimeException e) {
+                log.warn("Failed to cleanup attachments for email: {}", email.getId(), e);
+                errors++;
+            }
+        }
+        return new CleanupBatchOutcome(cleaned, errors);
     }
 
     Email send(Email email) {

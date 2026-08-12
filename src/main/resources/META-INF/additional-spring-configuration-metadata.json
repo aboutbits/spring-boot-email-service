@@ -23,6 +23,12 @@
             "type": "java.lang.Long",
             "description": "Specifies the milliseconds delay between runs of the scheduler.",
             "defaultValue": 30000
+        },
+        {
+            "name": "aboutbits.emailservice.scheduling.batch-size",
+            "type": "java.lang.Integer",
+            "description": "Maximum number of emails one pod claims per scheduler pass.",
+            "defaultValue": 50
         }
     ]
 }

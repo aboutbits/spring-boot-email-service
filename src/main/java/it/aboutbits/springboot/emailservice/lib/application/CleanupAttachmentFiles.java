@@ -2,16 +2,14 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentCleanerCallback;
-import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.List;
 
-@RequiredArgsConstructor
 @Log4j2
 @NullMarked
 public class CleanupAttachmentFiles {
@@ -20,35 +18,39 @@ public class CleanupAttachmentFiles {
     private final QueryEmail queryEmail;
     private final ManageEmail manageEmail;
     private final List<AttachmentCleanerCallback> callbacks;
+    private final int batchSize;
 
     private long lastInfoLogMillis = System.currentTimeMillis();
     private long silentRuns = 0;
     private boolean firstRun = true;
 
+    public CleanupAttachmentFiles(
+            QueryEmail queryEmail,
+            ManageEmail manageEmail,
+            List<AttachmentCleanerCallback> callbacks,
+            int batchSize
+    ) {
+        this.queryEmail = queryEmail;
+        this.manageEmail = manageEmail;
+        this.callbacks = callbacks;
+        this.batchSize = batchSize;
+    }
+
     @Scheduled(initialDelayString = "${aboutbits.emailservice.scheduling.interval:30000}", fixedDelayString = "${aboutbits.emailservice.scheduling.interval:30000}")
-    void cleanupAttachments() {
+    @Transactional
+    void claimAndCleanupAttachments() {
         logStartOfPass();
 
-        var emailsToCleanup = queryEmail.readyToCleanup();
+        var ids = queryEmail.claimReadyToCleanupIds(batchSize);
+        var outcome = manageEmail.cleanupBatch(ids);
 
-        var countCleaned = 0;
-        var countError = 0;
-        for (var email : emailsToCleanup) {
-            try {
-                manageEmail.cleanupAttachments(email);
-                countCleaned++;
-            } catch (AttachmentException e) {
-                countError++;
-            }
-        }
-
-        logEndOfPass(countCleaned, countError);
+        logEndOfPass(outcome.cleaned(), outcome.errors());
 
         for (var callback : callbacks) {
             callback.report(new AttachmentCleanerCallback.Report(
-                    emailsToCleanup.size(),
-                    countCleaned,
-                    countError
+                    outcome.total(),
+                    outcome.cleaned(),
+                    outcome.errors()
             ));
         }
     }

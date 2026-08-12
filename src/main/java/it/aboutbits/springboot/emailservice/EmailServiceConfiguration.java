@@ -16,6 +16,7 @@ import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmen
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import jakarta.persistence.EntityManager;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,25 +46,44 @@ public class EmailServiceConfiguration {
     }
 
     @Bean
-    public QueryEmail queryEmail(EmailRepository emailRepository, EmailMapper emailMapper, EntityManager entityManager) {
+    public QueryEmail queryEmail(
+            EmailRepository emailRepository,
+            EmailMapper emailMapper,
+            EntityManager entityManager
+    ) {
         return new QueryEmail(emailRepository, emailMapper, entityManager);
     }
 
     @Bean
-    public ManageEmail manageEmail(EmailRepository emailRepository, JavaMailSender javaMailSender, AttachmentDataSource attachmentDataSource, EmailMapper emailMapper) {
+    public ManageEmail manageEmail(
+            EmailRepository emailRepository,
+            JavaMailSender javaMailSender,
+            AttachmentDataSource attachmentDataSource,
+            EmailMapper emailMapper
+    ) {
         return new ManageEmail(emailRepository, javaMailSender, attachmentDataSource, emailMapper);
     }
 
     @Bean
     @ConditionalOnProperty(value = "aboutbits.emailservice.scheduling.enabled", matchIfMissing = true)
-    public SendScheduledEmails sendScheduledEmails(QueryEmail queryEmail, ManageEmail manageEmail, List<EmailSchedulerCallback> callbacks) {
-        return new SendScheduledEmails(queryEmail, manageEmail, callbacks);
+    public SendScheduledEmails sendScheduledEmails(
+            QueryEmail queryEmail,
+            ManageEmail manageEmail,
+            List<EmailSchedulerCallback> callbacks,
+            @Value("${aboutbits.emailservice.scheduling.batch-size:50}") int batchSize
+    ) {
+        return new SendScheduledEmails(queryEmail, manageEmail, callbacks, batchSize);
     }
 
     @Bean
     @ConditionalOnProperty(value = "aboutbits.emailservice.scheduling.cleanup.enabled", matchIfMissing = true)
-    public CleanupAttachmentFiles cleanupAttachments(QueryEmail queryEmail, ManageEmail manageEmail, List<AttachmentCleanerCallback> callbacks) {
-        return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks);
+    public CleanupAttachmentFiles cleanupAttachments(
+            QueryEmail queryEmail,
+            ManageEmail manageEmail,
+            List<AttachmentCleanerCallback> callbacks,
+            @Value("${aboutbits.emailservice.scheduling.batch-size:50}") int batchSize
+    ) {
+        return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks, batchSize);
     }
 
     @Bean
