@@ -51,7 +51,6 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
                         )
                     )
             order by e.scheduledAt
-            limit :limit
             """)
     List<Long> findCandidateIdsToSend(
             @Param("now") OffsetDateTime now,

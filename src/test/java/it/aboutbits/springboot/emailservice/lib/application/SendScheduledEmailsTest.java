@@ -28,7 +28,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest(properties = {
-        "aboutbits.emailservice.scheduling.batch-size=5",
         "aboutbits.emailservice.scheduling.max-attempts=3",
         "aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold=PT5M",
         "aboutbits.emailservice.scheduling.interval=30000"
@@ -36,7 +35,6 @@ import static org.mockito.Mockito.verify;
 @WithPostgres
 @NullMarked
 class SendScheduledEmailsTest {
-    private static final int BATCH_SIZE = 5;
     private static final int MAX_ATTEMPTS = 3;
     private static final int SCHEDULER_INTERVAL_SECONDS = 30;
 
@@ -67,19 +65,6 @@ class SendScheduledEmailsTest {
                 .allMatch(email -> email.getExecutionEndTime() != null)
                 .allMatch(email -> email.getAttempts() == 1);
         verify(javaMailSender, times(3)).send(any(MimeMessage.class));
-    }
-
-    @Test
-    void givenMoreEmailsThanBatchSize_sendEmails_shouldProcessOnlyBatchSizePerPass() {
-        var pending = 3 * BATCH_SIZE;
-        emailRepository.saveAll(IntStream.range(0, pending).mapToObj(_ -> EmailFactory.once().build()).toList());
-
-        sendScheduledEmails.sendEmails();
-
-        assertThat(emailRepository.findAll())
-                .filteredOn(email -> email.getState() == EmailState.SENT)
-                .hasSize(BATCH_SIZE);
-        verify(javaMailSender, times(BATCH_SIZE)).send(any(MimeMessage.class));
     }
 
     @Test
