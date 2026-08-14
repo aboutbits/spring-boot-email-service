@@ -32,10 +32,12 @@ public record EmailDto(
 
         OffsetDateTime scheduledAt,
         @Nullable
-        OffsetDateTime sentAt,
-
+        OffsetDateTime executionStartTime,
         @Nullable
-        OffsetDateTime errorAt,
+        OffsetDateTime executionEndTime,
+
+        int attempts,
+
         @Nullable
         String errorMessage,
 
