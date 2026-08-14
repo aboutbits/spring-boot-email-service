@@ -15,6 +15,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -161,7 +162,7 @@ class SendScheduledEmailsTest {
     void givenFreshSendingRowWithinThreshold_sendEmails_shouldNotStealFromOtherPod() {
         // executionStartTime within the 5-minute threshold means another pod is legitimately
         // sending this right now; we must not re-claim it.
-        var recentStart = OffsetDateTime.now().minusSeconds(30);
+        var recentStart = OffsetDateTime.now().minusSeconds(30).truncatedTo(ChronoUnit.MICROS);
         emailRepository.save(
                 EmailFactory.once()
                         .state(EmailState.SENDING)
