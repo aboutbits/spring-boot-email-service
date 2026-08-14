@@ -74,25 +74,11 @@ public class App {
 
 The following configuration options are available:
 
-| Name                                            | Default | Description                                                                                                    |
-|-------------------------------------------------|---------|----------------------------------------------------------------------------------------------------------------|
-| `aboutbits.emailservice.migrations.enabled`     | true    | Enables database migrations.                                                                                   |
-| `aboutbits.emailservice.scheduling.enabled`     | true    | Enables the scheduler sending the emails.                                                                      |
-| `aboutbits.emailservice.scheduling.cleanup.enabled` | true    | Enables cleanup of attachment files after sending.                                                             |
-| `aboutbits.emailservice.scheduling.interval`    | 30000   | Specifies the milliseconds delay between runs of the scheduler.                                                |
-| `aboutbits.emailservice.scheduling.batch-size`  | 50      | Maximum number of emails a single pod claims per scheduler pass (see [Multi-pod deployments](#multi-pod-deployments)). |
-
-## Multi-pod deployments
-
-The scheduler is safe to run in every pod concurrently. Each ready email is
-claimed by exactly one pod using Postgres row-level `SELECT ... FOR UPDATE SKIP LOCKED`,
-so pods work on disjoint rows in parallel and no email is ever sent twice by
-different pods. The same guarantee applies to the attachment cleanup scheduler.
-
-`aboutbits.emailservice.scheduling.batch-size` caps the number of emails one
-pod processes per pass. With the default 30s interval and 50 emails per pass,
-a single pod can take up to 100 emails per minute; For higher-throughput deployments increase the batch size or
-lower the interval.
+| Name                                   | Default     | Description                                                           |
+|----------------------------------------|-------------|-----------------------------------------------------------------------|
+| `lib.emailservice.migrations.enabled`  | true        | Enables database migrations.                                          |
+| `lib.emailservice.scheduling.enabled`  | true        | Enables the scheduler sending the emails.                             |
+| `lib.emailservice.scheduling.interval` | 30000       | Specifies the milliseconds delay between runs of the scheduler.       |
 
 ## Local development:
 

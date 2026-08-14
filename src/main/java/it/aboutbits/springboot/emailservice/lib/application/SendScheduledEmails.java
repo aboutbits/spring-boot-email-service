@@ -2,14 +2,15 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.EmailSchedulerCallback;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.util.List;
 
+@RequiredArgsConstructor
 @Log4j2
 @NullMarked
 public class SendScheduledEmails {
@@ -18,39 +19,38 @@ public class SendScheduledEmails {
     private final QueryEmail queryEmail;
     private final ManageEmail manageEmail;
     private final List<EmailSchedulerCallback> callbacks;
-    private final int batchSize;
 
     private long lastInfoLogMillis = System.currentTimeMillis();
     private long silentRuns = 0;
     private boolean firstRun = true;
 
-    public SendScheduledEmails(
-            QueryEmail queryEmail,
-            ManageEmail manageEmail,
-            List<EmailSchedulerCallback> callbacks,
-            int batchSize
-    ) {
-        this.queryEmail = queryEmail;
-        this.manageEmail = manageEmail;
-        this.callbacks = callbacks;
-        this.batchSize = batchSize;
-    }
-
     @Scheduled(initialDelayString = "${aboutbits.emailservice.scheduling.interval:30000}", fixedDelayString = "${aboutbits.emailservice.scheduling.interval:30000}")
-    @Transactional
-    void claimAndSendEmails() {
+    void sendEmails() {
         logStartOfPass();
 
-        var ids = queryEmail.claimReadyToSendIds(batchSize);
-        var outcome = manageEmail.sendBatch(ids);
+        var emailsToSend = queryEmail.readyToSend();
 
-        logEndOfPass(outcome.sent(), outcome.errors());
+        var countSent = 0;
+        var countError = 0;
+        for (var email : emailsToSend) {
+            var updatedEmail = manageEmail.send(email);
+            switch (updatedEmail.getState()) {
+                case ERROR -> countError++;
+                case SENT -> countSent++;
+                default -> log.warn(
+                        JOB_DESCRIPTION + " | Job produced an invalid notification result state: {}.",
+                        updatedEmail.getState().name()
+                );
+            }
+        }
+
+        logEndOfPass(countSent, countError);
 
         for (var callback : callbacks) {
             callback.report(new EmailSchedulerCallback.Report(
-                    outcome.total(),
-                    outcome.sent(),
-                    outcome.errors()
+                    emailsToSend.size(),
+                    countSent,
+                    countError
             ));
         }
     }
