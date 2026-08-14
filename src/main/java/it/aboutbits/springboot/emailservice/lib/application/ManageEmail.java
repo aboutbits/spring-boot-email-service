@@ -80,7 +80,6 @@ public class ManageEmail {
 
         email.setState(EmailState.SENDING);
         email.setExecutionStartTime(OffsetDateTime.now());
-        email.setErrorMessage(null);
         email.incrementAttempts();
         emailRepository.save(email);
 
