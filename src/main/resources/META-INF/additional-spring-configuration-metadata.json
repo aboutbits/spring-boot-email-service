@@ -23,6 +23,18 @@
             "type": "java.lang.Long",
             "description": "Specifies the milliseconds delay between runs of the scheduler.",
             "defaultValue": 30000
+        },
+        {
+            "name": "aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold",
+            "type": "java.time.Duration",
+            "description": "How long an email may stay in the SENDING state before being considered abandoned (crashed pod) and eligible to be re-claimed by another pod.",
+            "defaultValue": "PT5M"
+        },
+        {
+            "name": "aboutbits.emailservice.scheduling.max-attempts",
+            "type": "java.lang.Integer",
+            "description": "Maximum number of send attempts before an email is marked as ERROR. Applies to the scheduled retry loop; the synchronous sendOrFail path is fail-fast and does not retry.",
+            "defaultValue": 3
         }
     ]
 }
