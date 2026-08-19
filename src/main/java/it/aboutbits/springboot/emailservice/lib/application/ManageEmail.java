@@ -18,7 +18,10 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
@@ -40,6 +43,7 @@ public class ManageEmail {
     private final EmailMapper emailMapper;
     private final int maxAttempts;
     private final Duration schedulerInterval;
+    private final TransactionTemplate transactionTemplate;
 
     public ManageEmail(
             EmailRepository emailRepository,
@@ -47,7 +51,8 @@ public class ManageEmail {
             AttachmentDataSource attachmentDataSource,
             EmailMapper emailMapper,
             int maxAttempts,
-            Duration schedulerInterval
+            Duration schedulerInterval,
+            PlatformTransactionManager transactionManager
     ) {
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
@@ -55,6 +60,9 @@ public class ManageEmail {
         this.emailMapper = emailMapper;
         this.maxAttempts = maxAttempts;
         this.schedulerInterval = schedulerInterval;
+        // Persist the final email state in its own, independent transaction for sendOrFail to never make it roll back
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
@@ -78,10 +86,8 @@ public class ManageEmail {
             throw new EmailException(e);
         }
 
-        email.setState(EmailState.SENDING);
         email.setExecutionStartTime(OffsetDateTime.now());
         email.incrementAttempts();
-        emailRepository.save(email);
 
         try {
             sendMail(email);
@@ -94,7 +100,7 @@ public class ManageEmail {
             email.setErrorMessage(e.getMessage());
         }
 
-        var savedEmail = emailRepository.save(email);
+        var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(email));
 
         if (savedEmail.getState() == EmailState.ERROR) {
             throw new EmailException("Failed to send email [id=%s, providerMessage=%s]"
@@ -121,14 +127,15 @@ public class ManageEmail {
         } catch (Exception e) {
             email.setExecutionEndTime(OffsetDateTime.now());
             email.setErrorMessage(e.getMessage());
-            if (email.getAttempts() > maxAttempts) {
+            if (email.getAttempts() >= maxAttempts) {
                 log.error("Failed to send email: {}", email.getId(), e);
                 email.setState(EmailState.ERROR);
             } else {
                 log.warn("Failed to send email: {}; Will be tried again", email.getId(), e);
                 email.setState(EmailState.PENDING);
                 email.setScheduledAt(
-                        OffsetDateTime.now().plus(schedulerInterval.multipliedBy(email.getAttempts() * 2L))
+                        OffsetDateTime.now()
+                                .plus(schedulerInterval.multipliedBy((long) Math.pow(2, email.getAttempts())))
                 );
             }
         }
@@ -199,14 +206,13 @@ public class ManageEmail {
             payload.close();
         }
 
-
         mailSender.send(message);
     }
 
     private Email fromParameter(EmailParameter parameter) throws AttachmentException {
         var emailData = parameter.email();
 
-        final var email = new Email();
+        var email = new Email();
         email.setState(EmailState.PENDING);
         email.setScheduledAt(parameter.scheduledAt());
         email.setContent(new EmailContent(

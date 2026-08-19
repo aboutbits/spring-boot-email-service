@@ -22,6 +22,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import java.time.Duration;
 import java.util.List;
@@ -57,7 +58,8 @@ public class EmailServiceConfiguration {
             AttachmentDataSource attachmentDataSource,
             EmailMapper emailMapper,
             @Value("${aboutbits.emailservice.scheduling.max-attempts:3}") int maxAttempts,
-            @Value("${aboutbits.emailservice.scheduling.interval:30000}") long schedulerIntervalMillis
+            @Value("${aboutbits.emailservice.scheduling.interval:30000}") long schedulerIntervalMillis,
+            PlatformTransactionManager transactionManager
     ) {
         return new ManageEmail(
                 emailRepository,
@@ -65,7 +67,8 @@ public class EmailServiceConfiguration {
                 attachmentDataSource,
                 emailMapper,
                 maxAttempts,
-                Duration.ofMillis(schedulerIntervalMillis)
+                Duration.ofMillis(schedulerIntervalMillis),
+                transactionManager
         );
     }
 
@@ -75,7 +78,7 @@ public class EmailServiceConfiguration {
             QueryEmail queryEmail,
             ManageEmail manageEmail,
             List<EmailSchedulerCallback> callbacks,
-            @Value("${aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold:PT5M}") Duration stuckSendingRecoveryThreshold
+            @Value("${aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold:PT30M}") Duration stuckSendingRecoveryThreshold
     ) {
         return new SendScheduledEmails(queryEmail, manageEmail, callbacks, stuckSendingRecoveryThreshold);
     }

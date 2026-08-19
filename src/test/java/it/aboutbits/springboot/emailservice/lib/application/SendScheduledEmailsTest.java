@@ -81,7 +81,7 @@ class SendScheduledEmailsTest {
                 .satisfies(email -> {
                     assertThat(email.getState()).isEqualTo(EmailState.PENDING);
                     assertThat(email.getAttempts()).isEqualTo(1);
-                    // First retry backoff: attempts (1) * 2 * scheduler interval.
+                    // First retry backoff: 2^attempts * scheduler interval = 2 * scheduler interval
                     assertThat(email.getScheduledAt())
                             .isAfterOrEqualTo(beforePass.plusSeconds(2L * SCHEDULER_INTERVAL_SECONDS));
                     assertThat(email.getErrorMessage()).contains("smtp blip");
@@ -94,7 +94,7 @@ class SendScheduledEmailsTest {
         doThrow(new MailSendException("smtp down")).when(javaMailSender).send(any(MimeMessage.class));
         emailRepository.save(
                 EmailFactory.once()
-                        .attempts(MAX_ATTEMPTS)
+                        .attempts(MAX_ATTEMPTS - 1)
                         .scheduledAt(OffsetDateTime.now().minusSeconds(30))
                         .build()
         );
@@ -104,10 +104,10 @@ class SendScheduledEmailsTest {
         assertThat(emailRepository.findAll())
                 .singleElement()
                 .satisfies(email -> {
-                    // The atomic claim UPDATE incremented attempts from MAX_ATTEMPTS to MAX_ATTEMPTS+1,
-                    // which is > threshold, so the failure escalates to ERROR.
+                    // The atomic claim UPDATE incremented attempts from MAX_ATTEMPTS-1 to MAX_ATTEMPTS,
+                    // which is equal to the threshold, so the failure escalates to ERROR.
                     assertThat(email.getState()).isEqualTo(EmailState.ERROR);
-                    assertThat(email.getAttempts()).isEqualTo(MAX_ATTEMPTS + 1);
+                    assertThat(email.getAttempts()).isEqualTo(MAX_ATTEMPTS);
                     assertThat(email.getErrorMessage()).contains("smtp down");
                 });
     }
@@ -117,7 +117,7 @@ class SendScheduledEmailsTest {
         emailRepository.save(
                 EmailFactory.once()
                         .state(EmailState.ERROR)
-                        .attempts(MAX_ATTEMPTS + 1)
+                        .attempts(MAX_ATTEMPTS)
                         .scheduledAt(OffsetDateTime.now().minusMinutes(1))
                         .errorMessage("previous permanent failure")
                         .build()
@@ -129,7 +129,7 @@ class SendScheduledEmailsTest {
                 .singleElement()
                 .satisfies(email -> {
                     assertThat(email.getState()).isEqualTo(EmailState.ERROR);
-                    assertThat(email.getAttempts()).isEqualTo(MAX_ATTEMPTS + 1);
+                    assertThat(email.getAttempts()).isEqualTo(MAX_ATTEMPTS);
                 });
         verify(javaMailSender, times(0)).send(any(MimeMessage.class));
     }
