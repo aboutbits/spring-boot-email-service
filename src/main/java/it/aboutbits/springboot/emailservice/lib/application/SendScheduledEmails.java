@@ -50,20 +50,7 @@ public class SendScheduledEmails {
         var countError = 0;
         for (var id : candidateIds) {
             Optional<Email> claimed;
-            try {
-                claimed = manageEmail.tryClaimForSend(id, staleSendingBefore);
-            } catch (Exception e) {
-                // Claim failed and rolled back: nothing was sent and the row is unchanged, so it stays claimable
-                // Another pod may pick it up in this same pass, or it is retried on a later pass.
-                log.error(
-                        JOB_DESCRIPTION + " | Failed to claim email for sending: {}. "
-                                + "Nothing was sent and the row is unchanged; it stays claimable and may be picked up "
-                                + "by another pod in this cycle or retried on a later pass.",
-                        id,
-                        e
-                );
-                continue;
-            }
+            claimed = manageEmail.tryClaimForSend(id, staleSendingBefore);
 
             if (claimed.isEmpty()) {
                 // Lost race to another pod; Skip
