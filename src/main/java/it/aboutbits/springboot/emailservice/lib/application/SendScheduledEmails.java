@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.EmailSchedulerCallback;
+import it.aboutbits.springboot.emailservice.lib.model.Email;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -9,6 +10,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Log4j2
 @NullMarked
@@ -43,21 +45,55 @@ public class SendScheduledEmails {
         var staleSendingBefore = OffsetDateTime.now().minus(stuckSendingRecoveryThreshold);
         var candidateIds = queryEmail.candidateIdsToSend(staleSendingBefore);
 
+        var countClaimed = 0;
         var countSent = 0;
         var countError = 0;
         for (var id : candidateIds) {
-            var claimed = manageEmail.tryClaimForSend(id, staleSendingBefore);
+            Optional<Email> claimed;
+            try {
+                claimed = manageEmail.tryClaimForSend(id, staleSendingBefore);
+            } catch (Exception e) {
+                // Claim failed and rolled back: nothing was sent and the row is unchanged, so it stays claimable
+                // Another pod may pick it up in this same pass, or it is retried on a later pass.
+                log.error(
+                        JOB_DESCRIPTION + " | Failed to claim email for sending: {}. "
+                                + "Nothing was sent and the row is unchanged; it stays claimable and may be picked up "
+                                + "by another pod in this cycle or retried on a later pass.",
+                        id,
+                        e
+                );
+                continue;
+            }
+
             if (claimed.isEmpty()) {
                 // Lost race to another pod; Skip
                 continue;
             }
-            var updated = manageEmail.completeClaimedSend(claimed.get());
-            switch (updated.getState()) {
-                case ERROR, PENDING -> countError++;
-                case SENT -> countSent++;
-                default -> log.warn(
-                        JOB_DESCRIPTION + " | Job produced an invalid notification result state: {}.",
-                        updated.getState().name()
+            countClaimed++;
+
+            try {
+                var updated = manageEmail.completeClaimedSend(claimed.get());
+                switch (updated.getState()) {
+                    // We do not count PENDING emails as errors since they will
+                    // be retried and eventually end up in one of the two buckets.
+                    case ERROR -> countError++;
+                    case SENT -> countSent++;
+                    default -> log.warn(
+                            JOB_DESCRIPTION + " | Job produced an invalid notification result state: {}.",
+                            updated.getState().name()
+                    );
+                }
+            } catch (Exception e) {
+                // Best-effort visibility only: we cannot reliably recover here. The email may already have been
+                // sent but persisting the result failed, so the row stays in SENDING and will be re-claimed and
+                // re-sent after the recovery threshold (possible duplicate delivery).
+                countError++;
+                log.error(
+                        JOB_DESCRIPTION + " | Failed to complete send for email: {}. It may have been sent already; "
+                                + "if the result could not be persisted the row stays in SENDING and will be re-sent "
+                                + "after the recovery threshold (possible duplicate delivery).",
+                        id,
+                        e
                 );
             }
         }
@@ -66,7 +102,7 @@ public class SendScheduledEmails {
 
         for (var callback : callbacks) {
             callback.report(new EmailSchedulerCallback.Report(
-                    candidateIds.size(),
+                    countClaimed,
                     countSent,
                     countError
             ));
