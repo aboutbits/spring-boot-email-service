@@ -5,7 +5,6 @@ import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
@@ -23,7 +22,6 @@ import java.util.Optional;
 public class QueryEmail {
     private final EmailRepository emailRepository;
     private final EmailMapper emailMapper;
-    private final EntityManager entityManager;
 
     public Page<EmailDto> paginatedByState(EmailState state, PageRequest pageParameter) {
         var pageRequest = PageRequest.of(
@@ -42,30 +40,15 @@ public class QueryEmail {
         return emailMapper.toDto(emailRepository.findByIdIn(ids));
     }
 
-    List<Email> readyToSend() {
-        var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
-        return entityManager.createQuery(
-                        """
-                                SELECT e from Email e WHERE e.scheduledAt < :scheduledBefore AND e.state IN (
-                                    it.aboutbits.springboot.emailservice.lib.EmailState.PENDING,
-                                    it.aboutbits.springboot.emailservice.lib.EmailState.ERROR
-                                )
-                                """, Email.class
-                )
-                .setParameter("scheduledBefore", OffsetDateTime.now())
-                .setHint("jakarta.persistence.fetchgraph", entityGraph)
-                .getResultList();
+    List<Long> candidateIdsToSend(OffsetDateTime staleSendingBefore) {
+        return emailRepository.findCandidateIdsToSend(
+                OffsetDateTime.now(),
+                staleSendingBefore
+        );
     }
 
     List<Email> readyToCleanup() {
-        var entityGraph = entityManager.getEntityGraph("email_service_emails-entity-graph");
-        return entityManager.createQuery(
-                        """
-                                SELECT e from Email e WHERE e.attachmentsCleaned=false AND e.state=it.aboutbits.springboot.emailservice.lib.EmailState.SENT
-                                """, Email.class
-                )
-                .setHint("jakarta.persistence.fetchgraph", entityGraph)
-                .getResultList();
+        return emailRepository.findReadyToCleanup();
     }
 
     public Optional<EmailDto> byId(long id) {

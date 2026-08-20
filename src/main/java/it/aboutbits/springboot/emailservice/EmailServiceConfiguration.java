@@ -14,15 +14,17 @@ import it.aboutbits.springboot.emailservice.lib.application.QueryEmail;
 import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
 import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
-import jakarta.persistence.EntityManager;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import java.time.Duration;
 import java.util.List;
 
 @AutoConfigurationPackage
@@ -45,24 +47,49 @@ public class EmailServiceConfiguration {
     }
 
     @Bean
-    public QueryEmail queryEmail(EmailRepository emailRepository, EmailMapper emailMapper, EntityManager entityManager) {
-        return new QueryEmail(emailRepository, emailMapper, entityManager);
+    public QueryEmail queryEmail(EmailRepository emailRepository, EmailMapper emailMapper) {
+        return new QueryEmail(emailRepository, emailMapper);
     }
 
     @Bean
-    public ManageEmail manageEmail(EmailRepository emailRepository, JavaMailSender javaMailSender, AttachmentDataSource attachmentDataSource, EmailMapper emailMapper) {
-        return new ManageEmail(emailRepository, javaMailSender, attachmentDataSource, emailMapper);
+    public ManageEmail manageEmail(
+            EmailRepository emailRepository,
+            JavaMailSender javaMailSender,
+            AttachmentDataSource attachmentDataSource,
+            EmailMapper emailMapper,
+            @Value("${aboutbits.emailservice.scheduling.max-attempts:3}") int maxAttempts,
+            @Value("${aboutbits.emailservice.scheduling.interval:30000}") long schedulerIntervalMillis,
+            PlatformTransactionManager transactionManager
+    ) {
+        return new ManageEmail(
+                emailRepository,
+                javaMailSender,
+                attachmentDataSource,
+                emailMapper,
+                maxAttempts,
+                Duration.ofMillis(schedulerIntervalMillis),
+                transactionManager
+        );
     }
 
     @Bean
     @ConditionalOnProperty(value = "aboutbits.emailservice.scheduling.enabled", matchIfMissing = true)
-    public SendScheduledEmails sendScheduledEmails(QueryEmail queryEmail, ManageEmail manageEmail, List<EmailSchedulerCallback> callbacks) {
-        return new SendScheduledEmails(queryEmail, manageEmail, callbacks);
+    public SendScheduledEmails sendScheduledEmails(
+            QueryEmail queryEmail,
+            ManageEmail manageEmail,
+            List<EmailSchedulerCallback> callbacks,
+            @Value("${aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold:PT30M}") Duration stuckSendingRecoveryThreshold
+    ) {
+        return new SendScheduledEmails(queryEmail, manageEmail, callbacks, stuckSendingRecoveryThreshold);
     }
 
     @Bean
     @ConditionalOnProperty(value = "aboutbits.emailservice.scheduling.cleanup.enabled", matchIfMissing = true)
-    public CleanupAttachmentFiles cleanupAttachments(QueryEmail queryEmail, ManageEmail manageEmail, List<AttachmentCleanerCallback> callbacks) {
+    public CleanupAttachmentFiles cleanupAttachments(
+            QueryEmail queryEmail,
+            ManageEmail manageEmail,
+            List<AttachmentCleanerCallback> callbacks
+    ) {
         return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks);
     }
 

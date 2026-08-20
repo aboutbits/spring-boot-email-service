@@ -74,11 +74,19 @@ public class App {
 
 The following configuration options are available:
 
-| Name                                   | Default     | Description                                                           |
-|----------------------------------------|-------------|-----------------------------------------------------------------------|
-| `lib.emailservice.migrations.enabled`  | true        | Enables database migrations.                                          |
-| `lib.emailservice.scheduling.enabled`  | true        | Enables the scheduler sending the emails.                             |
-| `lib.emailservice.scheduling.interval` | 30000       | Specifies the milliseconds delay between runs of the scheduler.       |
+| Name                                                                    | Default | Description                                                                                                            |
+|-------------------------------------------------------------------------|---------|------------------------------------------------------------------------------------------------------------------------|
+| `aboutbits.emailservice.migrations.enabled`                             | true    | Enables database migrations.                                                                                           |
+| `aboutbits.emailservice.scheduling.enabled`                             | true    | Enables the scheduler sending the emails.                                                                              |
+| `aboutbits.emailservice.scheduling.cleanup.enabled`                     | true    | Enables cleanup of attachment files after sending.                                                                     |
+| `aboutbits.emailservice.scheduling.interval`                            | 30000   | Milliseconds delay between runs of the scheduler.                                                                      |
+| `aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold`    | PT30M   | How long an email may stay in `SENDING` before being considered abandoned (crashed pod) and eligible to be re-claimed. Must comfortably exceed the worst-case SMTP send duration: JavaMail's default connect/read/write timeouts are infinite, so configure `spring.mail.properties.mail.smtp.connectiontimeout`, `spring.mail.properties.mail.smtp.timeout` and `spring.mail.properties.mail.smtp.writetimeout` well below this threshold, otherwise a slow in-flight send can be re-claimed by another pod and delivered twice. |
+| `aboutbits.emailservice.scheduling.max-attempts`                        | 3       | Maximum number of send attempts before an email is marked as `ERROR`. Applies only to the scheduled retry loop. Failed attempts are retried with exponential backoff (`scheduling.interval` × 2^attempts); with the defaults a persistently failing email runs attempt 1 → +60s → attempt 2 → +120s → attempt 3 → `ERROR`. |
+
+## Multi-pod deployments
+
+The scheduler is safe to run on every pod concurrently: the database arbitrates which pod sends each email.
+Delivery is at-least-once - if a pod crashes after the SMTP server accepted the message but before the result was persisted, the email may be sent again on recovery.
 
 ## Local development:
 

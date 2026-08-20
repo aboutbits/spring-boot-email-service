@@ -69,6 +69,15 @@ public class EmailServiceMigrator {
 
                  alter table email_service_emails add column if not exists reply_to_address text;
                  alter table email_service_emails add column if not exists reply_to_name text;
+
+                 alter table email_service_emails add column if not exists attempts int default 0 not null;
+                 alter table email_service_emails add column if not exists execution_start_time timestamp with time zone;
+                 alter table email_service_emails add column if not exists execution_end_time timestamp with time zone;
+
+                 update email_service_emails
+                    set execution_end_time = sent_at
+                  where sent_at is not null
+                    and execution_end_time is null;
                 """
                 //@formatter:on
         );

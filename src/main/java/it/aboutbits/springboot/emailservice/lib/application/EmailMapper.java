@@ -6,6 +6,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.NullUnmarked;
 import org.mapstruct.AnnotateWith;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 
@@ -15,6 +16,14 @@ import java.util.List;
 @AnnotateWith(NullUnmarked.class)
 @NullMarked
 public interface EmailMapper {
+    @Mapping(source = "content.subject", target = "subject")
+    @Mapping(source = "content.fromAddress", target = "fromAddress")
+    @Mapping(source = "content.fromName", target = "fromName")
+    @Mapping(source = "content.replyToAddress", target = "replyToAddress")
+    @Mapping(source = "content.replyToName", target = "replyToName")
+    @Mapping(source = "content.recipients", target = "recipients")
+    @Mapping(source = "content.textBody", target = "textBody")
+    @Mapping(source = "content.htmlBody", target = "htmlBody")
     EmailDto toDto(Email model);
 
     List<EmailDto> toDto(List<Email> model);

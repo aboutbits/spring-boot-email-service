@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.support.database.factory;
 
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
+import it.aboutbits.springboot.emailservice.lib.model.EmailContent;
 import it.aboutbits.springboot.testing.testdata.FakerExtended;
 import org.jspecify.annotations.NullMarked;
 
@@ -20,14 +21,16 @@ public final class EmailFactory {
 
         return Email.builder()
                 .state(EmailState.PENDING)
-                .subject("Email subject")
-                .textBody(body)
-                .htmlBody("<h1>" + body + "</h1>")
                 .scheduledAt(OffsetDateTime.now())
-                .fromAddress(FAKER.internet().emailAddress())
-                .fromName(FAKER.name().fullName())
-                .replyToAddress(FAKER.internet().emailAddress())
-                .replyToName(FAKER.name().fullName())
-                .recipients(List.of(FAKER.internet().emailAddress(), FAKER.internet().emailAddress()));
+                .content(new EmailContent(
+                        "Email subject",
+                        FAKER.internet().emailAddress(),
+                        FAKER.name().fullName(),
+                        FAKER.internet().emailAddress(),
+                        FAKER.name().fullName(),
+                        List.of(FAKER.internet().emailAddress(), FAKER.internet().emailAddress()),
+                        body,
+                        "<h1>" + body + "</h1>"
+                ));
     }
 }

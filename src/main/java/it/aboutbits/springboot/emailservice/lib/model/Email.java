@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.lib.model;
 
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -18,24 +19,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.time.OffsetDateTime;
-import java.util.List;
+import java.util.HashSet;
 import java.util.Set;
 
 import static it.aboutbits.springboot.emailservice.lib.model.Email.DEFAULT_ENTITY_GRAPH;
 
-@NamedEntityGraph(
-        name = "email_service_emails-entity-graph",
-        attributeNodes = {
-                @NamedAttributeNode("attachments")
-        }
-)
 @Entity
 @Getter
 @Setter
@@ -55,34 +48,24 @@ public class Email {
     @Enumerated(EnumType.STRING)
     private EmailState state;
 
-    private String subject;
+    @Embedded
+    private EmailContent content;
 
-    private String fromAddress;
-    private String fromName;
-
-    @Nullable
-    private String replyToAddress;
-    @Nullable
-    private String replyToName;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    private List<String> recipients;
-
-    private String textBody;
-    private String htmlBody;
-
+    @Builder.Default
     @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "email", orphanRemoval = true)
-    private Set<EmailAttachment> attachments;
+    private Set<EmailAttachment> attachments = new HashSet<>();
 
     @Builder.Default
     private boolean attachmentsCleaned = false;
 
     private OffsetDateTime scheduledAt;
     @Nullable
-    private OffsetDateTime sentAt;
-
+    private OffsetDateTime executionStartTime;
     @Nullable
-    private OffsetDateTime errorAt;
+    private OffsetDateTime executionEndTime;
+
+    private int attempts = 0;
+
     @Nullable
     private String errorMessage;
 
@@ -92,11 +75,7 @@ public class Email {
     @UpdateTimestamp
     private OffsetDateTime updatedAt;
 
-    public boolean isSent() {
-        return EmailState.SENT.equals(state);
-    }
-
-    public boolean hasFailed() {
-        return EmailState.ERROR.equals(state);
+    public void incrementAttempts() {
+        this.attempts++;
     }
 }

@@ -9,21 +9,27 @@ import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
 import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
+import it.aboutbits.springboot.emailservice.lib.model.EmailContent;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 
@@ -35,17 +41,28 @@ public class ManageEmail {
     private final JavaMailSender mailSender;
     private final AttachmentDataSource attachmentDataSource;
     private final EmailMapper emailMapper;
+    private final int maxAttempts;
+    private final Duration schedulerInterval;
+    private final TransactionTemplate transactionTemplate;
 
     public ManageEmail(
             EmailRepository emailRepository,
             JavaMailSender mailSender,
             AttachmentDataSource attachmentDataSource,
-            final EmailMapper emailMapper
+            EmailMapper emailMapper,
+            int maxAttempts,
+            Duration schedulerInterval,
+            PlatformTransactionManager transactionManager
     ) {
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
         this.attachmentDataSource = attachmentDataSource;
         this.emailMapper = emailMapper;
+        this.maxAttempts = maxAttempts;
+        this.schedulerInterval = schedulerInterval;
+        // Persist the final email state in its own, independent transaction for sendOrFail to never make it roll back
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
@@ -69,9 +86,23 @@ public class ManageEmail {
             throw new EmailException(e);
         }
 
-        var savedEmail = send(email);
+        email.setExecutionStartTime(OffsetDateTime.now());
+        email.incrementAttempts();
 
-        if (savedEmail.hasFailed()) {
+        try {
+            sendMail(email);
+            email.setState(EmailState.SENT);
+            email.setExecutionEndTime(OffsetDateTime.now());
+        } catch (MessagingException | AttachmentException | IOException | RuntimeException e) {
+            log.error("Failed to send email: {}", email.getId(), e);
+            email.setState(EmailState.ERROR);
+            email.setExecutionEndTime(OffsetDateTime.now());
+            email.setErrorMessage(e.getMessage());
+        }
+
+        var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(email));
+
+        if (savedEmail.getState() == EmailState.ERROR) {
             throw new EmailException("Failed to send email [id=%s, providerMessage=%s]"
                                              .formatted(savedEmail.getId(), savedEmail.getErrorMessage()));
         }
@@ -79,23 +110,36 @@ public class ManageEmail {
         return emailMapper.toDto(savedEmail);
     }
 
-    Email send(Email email) {
-        if (EmailState.SENT.equals(email.getState())) {
-            return email;
-        }
+    // Atomically transitions the row from PENDING/stale-SENDING into SENDING
+    @Transactional
+    Optional<Email> tryClaimForSend(long id, OffsetDateTime staleSendingBefore) {
+        var claimed = emailRepository.claimForSend(id, OffsetDateTime.now(), staleSendingBefore);
+        return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
+    }
 
+    // Actually try sending the claimed email
+    Email completeClaimedSend(Email email) {
         try {
             sendMail(email);
             email.setState(EmailState.SENT);
-            email.setErrorMessage("");
-            email.setSentAt(OffsetDateTime.now());
-        } catch (MailException | MessagingException | AttachmentException | IOException e) {
-            log.error("Failed to send email: " + email.getId(), e);
+            email.setExecutionEndTime(OffsetDateTime.now());
+            email.setErrorMessage(null);
+        } catch (Exception e) {
+            email.setExecutionEndTime(OffsetDateTime.now());
             email.setErrorMessage(e.getMessage());
-            email.setState(EmailState.ERROR);
+            if (email.getAttempts() >= maxAttempts) {
+                log.error("Failed to send email: {}", email.getId(), e);
+                email.setState(EmailState.ERROR);
+            } else {
+                log.warn("Failed to send email: {}; Will be tried again", email.getId(), e);
+                email.setState(EmailState.PENDING);
+                email.setScheduledAt(
+                        OffsetDateTime.now()
+                                .plus(schedulerInterval.multipliedBy((long) Math.pow(2, email.getAttempts())))
+                );
+            }
         }
-
-        return emailRepository.save(email);
+        return transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
     void cleanupAttachments(final Email email) throws AttachmentException {
@@ -106,49 +150,17 @@ public class ManageEmail {
         emailRepository.save(email);
     }
 
-    private Email fromParameter(EmailParameter parameter) throws AttachmentException {
-        var emailData = parameter.email();
-
-        final var email = new Email();
-        email.setState(EmailState.PENDING);
-        email.setScheduledAt(parameter.scheduledAt());
-        email.setSubject(emailData.subject());
-        email.setTextBody(emailData.textBody());
-        email.setHtmlBody(emailData.htmlBody());
-        email.setRecipients(emailData.recipients());
-        email.setFromAddress(emailData.fromAddress());
-        email.setFromName(emailData.fromName());
-        email.setReplyToAddress(emailData.replyToAddress());
-        email.setReplyToName(emailData.replyToName());
-
-        var attachments = new HashSet<EmailAttachment>();
-        for (var attachment : parameter.email().attachments()) {
-            var reference = attachmentDataSource.storeAttachmentPayload(attachment.payload());
-
-            var emailAttachment = new EmailAttachment();
-            emailAttachment.setEmail(email);
-            emailAttachment.setContentType(attachment.contentType());
-            emailAttachment.setFileName(attachment.fileName());
-            emailAttachment.setFileReference(reference);
-
-            attachments.add(emailAttachment);
-        }
-
-        email.setAttachments(attachments);
-
-        return email;
-    }
-
     private void sendMail(Email email) throws MessagingException, IOException, AttachmentException {
+        var content = email.getContent();
         sendMail(
-                email.getFromAddress(),
-                email.getFromName(),
-                email.getReplyToAddress(),
-                email.getReplyToName(),
-                email.getRecipients(),
-                email.getSubject(),
-                email.getHtmlBody(),
-                email.getTextBody(),
+                content.fromAddress(),
+                content.fromName(),
+                content.replyToAddress(),
+                content.replyToName(),
+                content.recipients(),
+                content.subject(),
+                content.htmlBody(),
+                content.textBody(),
                 email.getAttachments()
         );
     }
@@ -194,7 +206,41 @@ public class ManageEmail {
             payload.close();
         }
 
-
         mailSender.send(message);
+    }
+
+    private Email fromParameter(EmailParameter parameter) throws AttachmentException {
+        var emailData = parameter.email();
+
+        var email = new Email();
+        email.setState(EmailState.PENDING);
+        email.setScheduledAt(parameter.scheduledAt());
+        email.setContent(new EmailContent(
+                emailData.subject(),
+                emailData.fromAddress(),
+                emailData.fromName(),
+                emailData.replyToAddress(),
+                emailData.replyToName(),
+                emailData.recipients(),
+                emailData.textBody(),
+                emailData.htmlBody()
+        ));
+
+        var attachments = new HashSet<EmailAttachment>();
+        for (var attachment : parameter.email().attachments()) {
+            var reference = attachmentDataSource.storeAttachmentPayload(attachment.payload());
+
+            var emailAttachment = new EmailAttachment();
+            emailAttachment.setEmail(email);
+            emailAttachment.setContentType(attachment.contentType());
+            emailAttachment.setFileName(attachment.fileName());
+            emailAttachment.setFileReference(reference);
+
+            attachments.add(emailAttachment);
+        }
+
+        email.setAttachments(attachments);
+
+        return email;
     }
 }

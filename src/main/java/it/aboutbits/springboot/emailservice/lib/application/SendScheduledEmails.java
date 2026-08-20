@@ -2,15 +2,16 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.EmailSchedulerCallback;
-import lombok.RequiredArgsConstructor;
+import it.aboutbits.springboot.emailservice.lib.model.Email;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
-@RequiredArgsConstructor
 @Log4j2
 @NullMarked
 public class SendScheduledEmails {
@@ -19,27 +20,67 @@ public class SendScheduledEmails {
     private final QueryEmail queryEmail;
     private final ManageEmail manageEmail;
     private final List<EmailSchedulerCallback> callbacks;
+    private final Duration stuckSendingRecoveryThreshold;
 
     private long lastInfoLogMillis = System.currentTimeMillis();
     private long silentRuns = 0;
     private boolean firstRun = true;
 
+    public SendScheduledEmails(
+            QueryEmail queryEmail,
+            ManageEmail manageEmail,
+            List<EmailSchedulerCallback> callbacks,
+            Duration stuckSendingRecoveryThreshold
+    ) {
+        this.queryEmail = queryEmail;
+        this.manageEmail = manageEmail;
+        this.callbacks = callbacks;
+        this.stuckSendingRecoveryThreshold = stuckSendingRecoveryThreshold;
+    }
+
     @Scheduled(initialDelayString = "${aboutbits.emailservice.scheduling.interval:30000}", fixedDelayString = "${aboutbits.emailservice.scheduling.interval:30000}")
     void sendEmails() {
         logStartOfPass();
 
-        var emailsToSend = queryEmail.readyToSend();
+        var staleSendingBefore = OffsetDateTime.now().minus(stuckSendingRecoveryThreshold);
+        var candidateIds = queryEmail.candidateIdsToSend(staleSendingBefore);
 
+        var countClaimed = 0;
         var countSent = 0;
         var countError = 0;
-        for (var email : emailsToSend) {
-            var updatedEmail = manageEmail.send(email);
-            switch (updatedEmail.getState()) {
-                case ERROR -> countError++;
-                case SENT -> countSent++;
-                default -> log.warn(
-                        JOB_DESCRIPTION + " | Job produced an invalid notification result state: {}.",
-                        updatedEmail.getState().name()
+        for (var id : candidateIds) {
+            Optional<Email> claimed;
+            claimed = manageEmail.tryClaimForSend(id, staleSendingBefore);
+
+            if (claimed.isEmpty()) {
+                // Lost race to another pod; Skip
+                continue;
+            }
+            countClaimed++;
+
+            try {
+                var updated = manageEmail.completeClaimedSend(claimed.get());
+                switch (updated.getState()) {
+                    // We do not count PENDING emails as errors since they will
+                    // be retried and eventually end up in one of the two buckets.
+                    case ERROR -> countError++;
+                    case SENT -> countSent++;
+                    default -> log.warn(
+                            JOB_DESCRIPTION + " | Job produced an invalid notification result state: {}.",
+                            updated.getState().name()
+                    );
+                }
+            } catch (Exception e) {
+                // Best-effort visibility only: we cannot reliably recover here. The email may already have been
+                // sent but persisting the result failed, so the row stays in SENDING and will be re-claimed and
+                // re-sent after the recovery threshold (possible duplicate delivery).
+                countError++;
+                log.error(
+                        JOB_DESCRIPTION + " | Failed to complete send for email: {}. It may have been sent already; "
+                                + "if the result could not be persisted the row stays in SENDING and will be re-sent "
+                                + "after the recovery threshold (possible duplicate delivery).",
+                        id,
+                        e
                 );
             }
         }
@@ -48,7 +89,7 @@ public class SendScheduledEmails {
 
         for (var callback : callbacks) {
             callback.report(new EmailSchedulerCallback.Report(
-                    emailsToSend.size(),
+                    countClaimed,
                     countSent,
                     countError
             ));
