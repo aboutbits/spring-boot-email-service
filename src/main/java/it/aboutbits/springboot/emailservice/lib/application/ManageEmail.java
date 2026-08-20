@@ -139,7 +139,7 @@ public class ManageEmail {
                 );
             }
         }
-        return emailRepository.save(email);
+        return transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
     void cleanupAttachments(final Email email) throws AttachmentException {
