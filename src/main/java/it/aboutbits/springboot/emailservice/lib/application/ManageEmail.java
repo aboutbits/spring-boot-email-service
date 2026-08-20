@@ -139,7 +139,7 @@ public class ManageEmail {
                 );
             }
         }
-        return emailRepository.save(email);
+        return transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
     // Atomically flips a not-yet-cleaned SENT row to cleaned
