@@ -84,11 +84,24 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
             @Param("staleSendingBefore") OffsetDateTime staleSendingBefore
     );
 
-    @EntityGraph(value = Email.DEFAULT_ENTITY_GRAPH)
+    // Plain read, no locking -> two pods may see overlapping candidate sets.
+    // The atomic UPDATE in claimForCleanup arbitrates the actual claim.
     @Query("""
-            select e from Email e
+            select e.id from Email e
                 where e.attachmentsCleaned = false
                     and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.SENT
             """)
-    List<Email> findReadyToCleanup();
+    List<Long> findCandidateIdsToCleanup();
+
+    // Atomic compare-and-set claim: flips a single not-yet-cleaned SENT row to cleaned.
+    // Concurrent updates are serialized against the same row, so EXACTLY ONE caller gets returned 1.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Email e
+               set e.attachmentsCleaned = true
+               where e.id = :id
+                   and e.attachmentsCleaned = false
+                   and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.SENT
+            """)
+    int claimForCleanup(@Param("id") long id);
 }

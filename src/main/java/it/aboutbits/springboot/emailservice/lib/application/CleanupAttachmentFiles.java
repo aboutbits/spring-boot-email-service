@@ -29,15 +29,24 @@ public class CleanupAttachmentFiles {
     void cleanupAttachments() {
         logStartOfPass();
 
-        var emailsToCleanup = queryEmail.readyToCleanup();
+        var candidateIds = queryEmail.candidateIdsToCleanup();
 
+        var countClaimed = 0;
         var countCleaned = 0;
         var countError = 0;
-        for (var email : emailsToCleanup) {
+        for (var id : candidateIds) {
+            var claimed = manageEmail.tryClaimForCleanup(id);
+
+            if (claimed.isEmpty()) {
+                // Lost race to another pod; Skip
+                continue;
+            }
+            countClaimed++;
+
             try {
-                manageEmail.cleanupAttachments(email);
+                manageEmail.completeClaimedCleanup(claimed.get());
                 countCleaned++;
-            } catch (AttachmentException e) {
+            } catch (AttachmentException _) {
                 countError++;
             }
         }
@@ -46,7 +55,7 @@ public class CleanupAttachmentFiles {
 
         for (var callback : callbacks) {
             callback.report(new AttachmentCleanerCallback.Report(
-                    emailsToCleanup.size(),
+                    countClaimed,
                     countCleaned,
                     countError
             ));

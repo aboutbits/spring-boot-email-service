@@ -60,7 +60,7 @@ public class ManageEmail {
         this.emailMapper = emailMapper;
         this.maxAttempts = maxAttempts;
         this.schedulerInterval = schedulerInterval;
-        // Persist the final email state in its own, independent transaction for sendOrFail to never make it roll back
+        // Persist the final email state in its own, independent transaction to never make it roll back
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -142,12 +142,25 @@ public class ManageEmail {
         return emailRepository.save(email);
     }
 
-    void cleanupAttachments(final Email email) throws AttachmentException {
-        for (var attachment : email.getAttachments()) {
-            attachmentDataSource.releaseAttachment(attachment.getFileReference());
+    // Atomically flips a not-yet-cleaned SENT row to cleaned
+    @Transactional
+    Optional<Email> tryClaimForCleanup(long id) {
+        var claimed = emailRepository.claimForCleanup(id);
+        return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
+    }
+
+    // Actually release the attachment payloads of the claimed email
+    void completeClaimedCleanup(final Email email) throws AttachmentException {
+        try {
+            for (var attachment : email.getAttachments()) {
+                attachmentDataSource.releaseAttachment(attachment.getFileReference());
+            }
+        } catch (AttachmentException e) {
+            // Undo the claim so the row is retried on a later pass
+            email.setAttachmentsCleaned(false);
+            transactionTemplate.execute(_ -> emailRepository.save(email));
+            throw e;
         }
-        email.setAttachmentsCleaned(true);
-        emailRepository.save(email);
     }
 
     private void sendMail(Email email) throws MessagingException, IOException, AttachmentException {
