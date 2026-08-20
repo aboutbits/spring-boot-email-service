@@ -86,22 +86,36 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
 
     // Plain read, no locking -> two pods may see overlapping candidate sets.
     // The atomic UPDATE in claimForCleanup arbitrates the actual claim.
+    // Includes rows whose cleanup was abandoned by a crashed pod (past the stale threshold).
     @Query("""
             select e.id from Email e
                 where e.attachmentsCleaned = false
                     and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.SENT
+                    and (
+                        e.cleanupStartTime is null
+                        or e.cleanupStartTime < :staleCleanupBefore
+                    )
             """)
-    List<Long> findCandidateIdsToCleanup();
+    List<Long> findCandidateIdsToCleanup(@Param("staleCleanupBefore") OffsetDateTime staleCleanupBefore);
 
-    // Atomic compare-and-set claim: flips a single not-yet-cleaned SENT row to cleaned.
+    // Atomic compare-and-set claim: marks a single not-yet-cleaned SENT row as cleanup-in-progress
+    // by stamping cleanupStartTime, if it is claimable (never started, or abandoned by a crashed pod past the stale threshold).
     // Concurrent updates are serialized against the same row, so EXACTLY ONE caller gets returned 1.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Email e
-               set e.attachmentsCleaned = true
+               set e.cleanupStartTime = :now
                where e.id = :id
                    and e.attachmentsCleaned = false
                    and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.SENT
+                   and (
+                       e.cleanupStartTime is null
+                       or e.cleanupStartTime < :staleCleanupBefore
+                   )
             """)
-    int claimForCleanup(@Param("id") long id);
+    int claimForCleanup(
+            @Param("id") long id,
+            @Param("now") OffsetDateTime now,
+            @Param("staleCleanupBefore") OffsetDateTime staleCleanupBefore
+    );
 }

@@ -142,25 +142,20 @@ public class ManageEmail {
         return transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
-    // Atomically flips a not-yet-cleaned SENT row to cleaned
+    // Atomically marks a not-yet-cleaned SENT row as cleanup-in-progress
     @Transactional
-    Optional<Email> tryClaimForCleanup(long id) {
-        var claimed = emailRepository.claimForCleanup(id);
+    Optional<Email> tryClaimForCleanup(long id, OffsetDateTime staleCleanupBefore) {
+        var claimed = emailRepository.claimForCleanup(id, OffsetDateTime.now(), staleCleanupBefore);
         return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
     }
 
-    // Actually release the attachment payloads of the claimed email
+    // Actually release the attachment payloads of the claimed email.
     void completeClaimedCleanup(final Email email) throws AttachmentException {
-        try {
-            for (var attachment : email.getAttachments()) {
-                attachmentDataSource.releaseAttachment(attachment.getFileReference());
-            }
-        } catch (AttachmentException e) {
-            // Undo the claim so the row is retried on a later pass
-            email.setAttachmentsCleaned(false);
-            transactionTemplate.execute(_ -> emailRepository.save(email));
-            throw e;
+        for (var attachment : email.getAttachments()) {
+            attachmentDataSource.releaseAttachment(attachment.getFileReference());
         }
+        email.setAttachmentsCleaned(true);
+        transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
     private void sendMail(Email email) throws MessagingException, IOException, AttachmentException {

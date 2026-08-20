@@ -88,9 +88,10 @@ public class EmailServiceConfiguration {
     public CleanupAttachmentFiles cleanupAttachments(
             QueryEmail queryEmail,
             ManageEmail manageEmail,
-            List<AttachmentCleanerCallback> callbacks
+            List<AttachmentCleanerCallback> callbacks,
+            @Value("${aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold:PT30M}") Duration stuckCleanupRecoveryThreshold
     ) {
-        return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks);
+        return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks, stuckCleanupRecoveryThreshold);
     }
 
     @Bean

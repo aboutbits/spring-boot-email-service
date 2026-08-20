@@ -46,8 +46,8 @@ public class QueryEmail {
         );
     }
 
-    List<Long> candidateIdsToCleanup() {
-        return emailRepository.findCandidateIdsToCleanup();
+    List<Long> candidateIdsToCleanup(OffsetDateTime staleCleanupBefore) {
+        return emailRepository.findCandidateIdsToCleanup(staleCleanupBefore);
     }
 
     public Optional<EmailDto> byId(long id) {

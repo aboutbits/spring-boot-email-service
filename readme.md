@@ -81,12 +81,14 @@ The following configuration options are available:
 | `aboutbits.emailservice.scheduling.cleanup.enabled`                     | true    | Enables cleanup of attachment files after sending.                                                                     |
 | `aboutbits.emailservice.scheduling.interval`                            | 30000   | Milliseconds delay between runs of the scheduler.                                                                      |
 | `aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold`    | PT30M   | How long an email may stay in `SENDING` before being considered abandoned (crashed pod) and eligible to be re-claimed. Must comfortably exceed the worst-case SMTP send duration: JavaMail's default connect/read/write timeouts are infinite, so configure `spring.mail.properties.mail.smtp.connectiontimeout`, `spring.mail.properties.mail.smtp.timeout` and `spring.mail.properties.mail.smtp.writetimeout` well below this threshold, otherwise a slow in-flight send can be re-claimed by another pod and delivered twice. |
+| `aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold`    | PT30M   | How long an email may keep its attachment-cleanup lock before the cleanup is considered abandoned (crashed pod) and eligible to be re-claimed. Must comfortably exceed the worst-case duration of releasing all attachments of a single email, otherwise a slow in-flight cleanup can be re-claimed by another pod and its attachments released twice (harmless only if `AttachmentDataSource.releaseAttachment` is idempotent). |
 | `aboutbits.emailservice.scheduling.max-attempts`                        | 3       | Maximum number of send attempts before an email is marked as `ERROR`. Applies only to the scheduled retry loop. Failed attempts are retried with exponential backoff (`scheduling.interval` × 2^attempts); with the defaults a persistently failing email runs attempt 1 → +60s → attempt 2 → +120s → attempt 3 → `ERROR`. |
 
 ## Multi-pod deployments
 
-The scheduler is safe to run on every pod concurrently: the database arbitrates which pod sends each email.
+Both schedulers are safe to run on every pod concurrently: the database arbitrates which pod handles each email.
 Delivery is at-least-once - if a pod crashes after the SMTP server accepted the message but before the result was persisted, the email may be sent again on recovery.
+Attachment Cleanup is at-least-once - if a pod crashes after releasing the attachments but before the result was persisted, the cleanup may be retried on recovery.
 
 ## Local development:
 
