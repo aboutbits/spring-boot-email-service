@@ -60,7 +60,7 @@ public class ManageEmail {
         this.emailMapper = emailMapper;
         this.maxAttempts = maxAttempts;
         this.schedulerInterval = schedulerInterval;
-        // Persist the final email state in its own, independent transaction for sendOrFail to never make it roll back
+        // Persist the final email state in its own, independent transaction to never make it roll back
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -142,12 +142,20 @@ public class ManageEmail {
         return transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
-    void cleanupAttachments(final Email email) throws AttachmentException {
+    // Atomically marks a not-yet-cleaned SENT row as cleanup-in-progress
+    @Transactional
+    Optional<Email> tryClaimForCleanup(long id, OffsetDateTime staleCleanupBefore) {
+        var claimed = emailRepository.claimForCleanup(id, OffsetDateTime.now(), staleCleanupBefore);
+        return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
+    }
+
+    // Actually release the attachment payloads of the claimed email.
+    void completeClaimedCleanup(final Email email) throws AttachmentException {
         for (var attachment : email.getAttachments()) {
             attachmentDataSource.releaseAttachment(attachment.getFileReference());
         }
         email.setAttachmentsCleaned(true);
-        emailRepository.save(email);
+        transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 
     private void sendMail(Email email) throws MessagingException, IOException, AttachmentException {

@@ -4,7 +4,6 @@ package it.aboutbits.springboot.emailservice.lib.application;
 import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
-import it.aboutbits.springboot.emailservice.lib.model.Email;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
@@ -47,8 +46,8 @@ public class QueryEmail {
         );
     }
 
-    List<Email> readyToCleanup() {
-        return emailRepository.findReadyToCleanup();
+    List<Long> candidateIdsToCleanup(OffsetDateTime staleCleanupBefore) {
+        return emailRepository.findCandidateIdsToCleanup(staleCleanupBefore);
     }
 
     public Optional<EmailDto> byId(long id) {

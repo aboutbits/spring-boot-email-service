@@ -2,13 +2,13 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentCleanerCallback;
-import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import java.time.Duration;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @RequiredArgsConstructor
@@ -20,6 +20,7 @@ public class CleanupAttachmentFiles {
     private final QueryEmail queryEmail;
     private final ManageEmail manageEmail;
     private final List<AttachmentCleanerCallback> callbacks;
+    private final Duration stuckCleanupRecoveryThreshold;
 
     private long lastInfoLogMillis = System.currentTimeMillis();
     private long silentRuns = 0;
@@ -29,15 +30,25 @@ public class CleanupAttachmentFiles {
     void cleanupAttachments() {
         logStartOfPass();
 
-        var emailsToCleanup = queryEmail.readyToCleanup();
+        var staleCleanupBefore = OffsetDateTime.now().minus(stuckCleanupRecoveryThreshold);
+        var candidateIds = queryEmail.candidateIdsToCleanup(staleCleanupBefore);
 
+        var countClaimed = 0;
         var countCleaned = 0;
         var countError = 0;
-        for (var email : emailsToCleanup) {
+        for (var id : candidateIds) {
+            var claimed = manageEmail.tryClaimForCleanup(id, staleCleanupBefore);
+
+            if (claimed.isEmpty()) {
+                // Lost race to another pod; Skip
+                continue;
+            }
+            countClaimed++;
+
             try {
-                manageEmail.cleanupAttachments(email);
+                manageEmail.completeClaimedCleanup(claimed.get());
                 countCleaned++;
-            } catch (AttachmentException e) {
+            } catch (Exception _) {
                 countError++;
             }
         }
@@ -46,7 +57,7 @@ public class CleanupAttachmentFiles {
 
         for (var callback : callbacks) {
             callback.report(new AttachmentCleanerCallback.Report(
-                    emailsToCleanup.size(),
+                    countClaimed,
                     countCleaned,
                     countError
             ));

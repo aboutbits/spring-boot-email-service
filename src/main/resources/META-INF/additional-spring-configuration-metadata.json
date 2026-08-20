@@ -31,6 +31,12 @@
             "defaultValue": "PT30M"
         },
         {
+            "name": "aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold",
+            "type": "java.time.Duration",
+            "description": "How long an email may keep its attachment-cleanup lock before the cleanup is considered abandoned (crashed pod) and eligible to be re-claimed. Must comfortably exceed the worst-case duration of releasing all attachments of a single email, otherwise a slow in-flight cleanup can be re-claimed by another pod and its attachments released twice (harmless only if `AttachmentDataSource.releaseAttachment` is idempotent).",
+            "defaultValue": "PT30M"
+        },
+        {
             "name": "aboutbits.emailservice.scheduling.max-attempts",
             "type": "java.lang.Integer",
             "description": "Maximum number of send attempts before an email is marked as ERROR. Applies to the scheduled retry loop; the synchronous sendOrFail path is fail-fast and does not retry. Failed attempts are retried with exponential backoff (scheduling.interval x 2^attempts); with the defaults a persistently failing email runs attempt 1 -> +60s -> attempt 2 -> +120s -> attempt 3 -> ERROR.",

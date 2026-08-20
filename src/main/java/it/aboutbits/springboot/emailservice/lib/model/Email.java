@@ -58,6 +58,9 @@ public class Email {
     @Builder.Default
     private boolean attachmentsCleaned = false;
 
+    @Nullable
+    private OffsetDateTime cleanupStartTime;
+
     private OffsetDateTime scheduledAt;
     @Nullable
     private OffsetDateTime executionStartTime;
