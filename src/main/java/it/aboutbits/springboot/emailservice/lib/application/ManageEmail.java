@@ -3,6 +3,7 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.EmailDto;
+import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
@@ -41,15 +42,18 @@ public class ManageEmail {
     private final JavaMailSender mailSender;
     private final AttachmentDataSource attachmentDataSource;
     private final EmailMapper emailMapper;
+    private final EmailMetrics emailMetrics;
     private final int maxAttempts;
     private final Duration schedulerInterval;
     private final TransactionTemplate transactionTemplate;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public ManageEmail(
             EmailRepository emailRepository,
             JavaMailSender mailSender,
             AttachmentDataSource attachmentDataSource,
             EmailMapper emailMapper,
+            EmailMetrics emailMetrics,
             int maxAttempts,
             Duration schedulerInterval,
             PlatformTransactionManager transactionManager
@@ -58,6 +62,7 @@ public class ManageEmail {
         this.mailSender = mailSender;
         this.attachmentDataSource = attachmentDataSource;
         this.emailMapper = emailMapper;
+        this.emailMetrics = emailMetrics;
         this.maxAttempts = maxAttempts;
         this.schedulerInterval = schedulerInterval;
         // Persist the final email state in its own, independent transaction to never make it roll back
@@ -89,16 +94,31 @@ public class ManageEmail {
         email.setExecutionStartTime(OffsetDateTime.now());
         email.incrementAttempts();
 
+        var startNanos = System.nanoTime();
+        EmailMetrics.SendOutcome outcome;
+
         try {
             sendMail(email);
             email.setState(EmailState.SENT);
             email.setExecutionEndTime(OffsetDateTime.now());
+            outcome = EmailMetrics.SendOutcome.SENT;
         } catch (MessagingException | AttachmentException | IOException | RuntimeException e) {
             log.error("Failed to send email: {}", email.getId(), e);
             email.setState(EmailState.ERROR);
             email.setExecutionEndTime(OffsetDateTime.now());
             email.setErrorMessage(e.getMessage());
+            outcome = EmailMetrics.SendOutcome.ERROR;
         }
+
+        // Recorded before persisting: the attempt against the SMTP server happened either way, and a
+        // failure to write down its result is reported on the scheduler pass, not on the attempt. Safe
+        // to do here only because the sink is fail-safe (see FailSafeEmailMetrics): nothing between the
+        // send and the save may throw, or a delivered email stays unpersisted and is sent again.
+        emailMetrics.sendAttempt(
+                EmailMetrics.SendMode.DIRECT,
+                outcome,
+                Duration.ofNanos(System.nanoTime() - startNanos)
+        );
 
         var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(email));
 
@@ -119,17 +139,22 @@ public class ManageEmail {
 
     // Actually try sending the claimed email
     Email completeClaimedSend(Email email) {
+        var startNanos = System.nanoTime();
+        EmailMetrics.SendOutcome outcome;
+
         try {
             sendMail(email);
             email.setState(EmailState.SENT);
             email.setExecutionEndTime(OffsetDateTime.now());
             email.setErrorMessage(null);
+            outcome = EmailMetrics.SendOutcome.SENT;
         } catch (Exception e) {
             email.setExecutionEndTime(OffsetDateTime.now());
             email.setErrorMessage(e.getMessage());
             if (email.getAttempts() >= maxAttempts) {
                 log.error("Failed to send email: {}", email.getId(), e);
                 email.setState(EmailState.ERROR);
+                outcome = EmailMetrics.SendOutcome.ERROR;
             } else {
                 log.warn("Failed to send email: {}; Will be tried again", email.getId(), e);
                 email.setState(EmailState.PENDING);
@@ -137,8 +162,20 @@ public class ManageEmail {
                         OffsetDateTime.now()
                                 .plus(schedulerInterval.multipliedBy((long) Math.pow(2, email.getAttempts())))
                 );
+                outcome = EmailMetrics.SendOutcome.RETRY;
             }
         }
+
+        // Recorded before persisting: the attempt against the SMTP server happened either way, and a
+        // failure to write down its result is reported on the scheduler pass, not on the attempt. Safe
+        // to do here only because the sink is fail-safe (see FailSafeEmailMetrics): nothing between the
+        // send and the save may throw, or a delivered email stays unpersisted and is sent again.
+        emailMetrics.sendAttempt(
+                EmailMetrics.SendMode.SCHEDULED,
+                outcome,
+                Duration.ofNanos(System.nanoTime() - startNanos)
+        );
+
         return transactionTemplate.execute(_ -> emailRepository.save(email));
     }
 

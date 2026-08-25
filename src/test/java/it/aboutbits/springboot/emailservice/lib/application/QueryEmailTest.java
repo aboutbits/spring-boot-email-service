@@ -13,6 +13,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,5 +96,33 @@ class QueryEmailTest {
     @Test
     void givenNoEmailNotification_byIdOrFail_shouldFail() {
         assertThat(queryEmail.byId(123L)).isNotPresent();
+    }
+
+    @Test
+    void givenEmailsInEveryState_queueSnapshot_shouldCountOnlyTheOpenOnesAndAgeTheOldestDueOne() {
+        emailRepository.saveAll(Set.of(
+                EmailFactory.once().scheduledAt(OffsetDateTime.now().minus(10, ChronoUnit.MINUTES)).build(),
+                EmailFactory.once().scheduledAt(OffsetDateTime.now().minus(5, ChronoUnit.MINUTES)).build(),
+                EmailFactory.once().scheduledAt(OffsetDateTime.now().plus(1, ChronoUnit.HOURS)).build(),
+                EmailFactory.once().state(EmailState.SENDING).build(),
+                EmailFactory.once().state(EmailState.SENT).build(),
+                EmailFactory.once().state(EmailState.ERROR).build()
+        ));
+
+        var result = queryEmail.queueSnapshot();
+
+        assertThat(result.pending()).isEqualTo(3L);
+        assertThat(result.sending()).isEqualTo(1L);
+        assertThat(result.oldestDueAge()).isBetween(Duration.ofMinutes(9), Duration.ofMinutes(11));
+    }
+
+    @Test
+    void givenNothingIsDue_queueSnapshot_shouldReportNoAge() {
+        emailRepository.save(EmailFactory.once().scheduledAt(OffsetDateTime.now().plus(1, ChronoUnit.HOURS)).build());
+
+        var result = queryEmail.queueSnapshot();
+
+        assertThat(result.pending()).isEqualTo(1L);
+        assertThat(result.oldestDueAge()).isNull();
     }
 }

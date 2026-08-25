@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentCleanerCallback;
+import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jspecify.annotations.NullMarked;
@@ -20,6 +21,7 @@ public class CleanupAttachmentFiles {
     private final QueryEmail queryEmail;
     private final ManageEmail manageEmail;
     private final List<AttachmentCleanerCallback> callbacks;
+    private final EmailMetrics emailMetrics;
     private final Duration stuckCleanupRecoveryThreshold;
 
     private long lastInfoLogMillis = System.currentTimeMillis();
@@ -28,6 +30,10 @@ public class CleanupAttachmentFiles {
 
     @Scheduled(initialDelayString = "${aboutbits.emailservice.scheduling.interval:30000}", fixedDelayString = "${aboutbits.emailservice.scheduling.interval:30000}")
     void cleanupAttachments() {
+        emailMetrics.timedPass(EmailMetrics.Job.CLEANUP, this::runPass);
+    }
+
+    private void runPass() {
         logStartOfPass();
 
         var staleCleanupBefore = OffsetDateTime.now().minus(stuckCleanupRecoveryThreshold);
@@ -45,12 +51,19 @@ public class CleanupAttachmentFiles {
             }
             countClaimed++;
 
+            var startNanos = System.nanoTime();
+            EmailMetrics.CleanupOutcome outcome;
+
             try {
                 manageEmail.completeClaimedCleanup(claimed.get());
                 countCleaned++;
+                outcome = EmailMetrics.CleanupOutcome.CLEANED;
             } catch (Exception _) {
                 countError++;
+                outcome = EmailMetrics.CleanupOutcome.ERROR;
             }
+
+            emailMetrics.cleanupAttempt(outcome, Duration.ofNanos(System.nanoTime() - startNanos));
         }
 
         logEndOfPass(countCleaned, countError);
