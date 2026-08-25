@@ -22,6 +22,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.FileCopyUtils;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
@@ -209,16 +210,15 @@ public class ManageEmail {
         }
 
         for (var attachment : attachments) {
-            ByteArrayResource resource;
-            try (var payload = attachmentDataSource.getAttachmentPayload(attachment.getFileReference())) {
-                resource = new ByteArrayResource(payload.readAllBytes());
-            }
+            var resource = new ByteArrayResource(FileCopyUtils.copyToByteArray(
+                    attachmentDataSource.getAttachmentPayload(attachment.getFileReference())
+            ));
 
             var contentId = attachment.getContentId();
             if (contentId != null) {
-                helper.addInline(contentId, resource, attachment.getContentType());
+                helper.addInline(contentId, attachment.getFileName(), resource, attachment.getContentType());
             } else {
-                helper.addAttachment(attachment.getFileName(), resource);
+                helper.addAttachment(attachment.getFileName(), resource, attachment.getContentType());
             }
         }
 

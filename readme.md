@@ -40,8 +40,8 @@ EmailParameter.Email.builder()
 // @formatter:on
 ```
 
-Attachments without a `contentId` are added as regular attachments. Each `contentId` must be referenced in the
-`htmlBody` as `cid:contentId`, otherwise validation fails.
+Attachments without a `contentId` are added as regular attachments. Each `contentId` must be unique and referenced
+in the `htmlBody` as `cid:contentId`, otherwise validation fails.
 
 ## Usage
 

@@ -11,8 +11,11 @@ import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.internet.MimeMultipart;
 import jakarta.validation.ConstraintViolationException;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -164,25 +167,10 @@ class ManageEmailTest {
     void givenInlineAttachment_schedule_shouldPersistContentId() throws EmailException, AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
 
-        var parameter = EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1><img src=\"cid:header-logo\">")
-                               .recipient("person1@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("logo.png")
-                                               .contentId("header-logo")
-                                               .payload(new ByteArrayInputStream(new byte[]{1, 2, 3}))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
+        var parameter = getValidParameterWithInlineAttachment(
+                "<h1>Html email body</h1><img src=\"cid:header-logo\">",
+                inlineAttachment("header-logo")
+        );
 
         var result = manageEmail.schedule(parameter);
 
@@ -198,32 +186,11 @@ class ManageEmailTest {
         when(attachmentDataSource.getAttachmentPayload(anyLong()))
                 .thenAnswer(_ -> new ByteArrayInputStream(new byte[]{1, 2, 3}));
 
-        var parameter = EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1><img src=\"cid:header-logo\">")
-                               .recipient("person1@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("logo.png")
-                                               .contentId("header-logo")
-                                               .payload(new ByteArrayInputStream(new byte[]{1, 2, 3}))
-                                               .build()
-                               )
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("x.png")
-                                               .payload(new ByteArrayInputStream(new byte[]{1, 2, 3}))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
+        var parameter = getValidParameterWithInlineAttachment(
+                "<h1>Html email body</h1><img src=\"cid:header-logo\">",
+                inlineAttachment("header-logo"),
+                regularAttachment("x.png")
+        );
 
         var result = manageEmail.sendOrFail(parameter);
 
@@ -244,6 +211,7 @@ class ManageEmailTest {
                 .orElseThrow();
         assertThat(inlinePart.getContentID()).isEqualTo("<header-logo>");
         assertThat(inlinePart.getContentType()).startsWith("image/png");
+        assertThat(inlinePart.getFileName()).isEqualTo("logo.png");
 
         var attachmentPart = parts.stream()
                 .filter(part -> hasDisposition(part, Part.ATTACHMENT))
@@ -253,26 +221,29 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenInlineAttachmentWithoutHtmlBody_schedule_shouldFail() {
-        var parameter = EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("")
-                               .recipient("person1@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("logo.png")
-                                               .contentId("header-logo")
-                                               .payload(new ByteArrayInputStream(new byte[0]))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
+    void givenUppercaseCidReference_schedule_shouldSucceed() throws EmailException, AttachmentException {
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
+
+        var parameter = getValidParameterWithInlineAttachment(
+                "<h1>Html email body</h1><img src=\"CID:header-logo\">",
+                inlineAttachment("header-logo")
+        );
+
+        var result = manageEmail.schedule(parameter);
+
+        assertThat(result.state()).isEqualTo(EmailState.PENDING);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "'', header-logo",
+            ", header-logo",
+            "<h1>Html email body</h1>, header-logo",
+            "<img src=cid:header-logo-big>, header-logo",
+            "<h1>Html email body</h1>, ' '"
+    })
+    void givenInvalidInlineAttachment_schedule_shouldFail(@Nullable String htmlBody, String contentId) {
+        var parameter = getValidParameterWithInlineAttachment(htmlBody, inlineAttachment(contentId));
 
         assertThatExceptionOfType(ConstraintViolationException.class).isThrownBy(
                 () -> manageEmail.schedule(parameter)
@@ -280,53 +251,12 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenContentIdNotReferencedInHtmlBody_schedule_shouldFail() {
-        var parameter = EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1>")
-                               .recipient("person1@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("logo.png")
-                                               .contentId("header-logo")
-                                               .payload(new ByteArrayInputStream(new byte[0]))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
-
-        assertThatExceptionOfType(ConstraintViolationException.class).isThrownBy(
-                () -> manageEmail.schedule(parameter)
+    void givenDuplicateContentIds_schedule_shouldFail() {
+        var parameter = getValidParameterWithInlineAttachment(
+                "<h1>Html email body</h1><img src=\"cid:header-logo\">",
+                inlineAttachment("header-logo"),
+                inlineAttachment("header-logo", "other.png")
         );
-    }
-
-    @Test
-    void givenBlankContentId_schedule_shouldFail() {
-        var parameter = EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1>")
-                               .recipient("person1@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("logo.png")
-                                               .contentId(" ")
-                                               .payload(new ByteArrayInputStream(new byte[0]))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
 
         assertThatExceptionOfType(ConstraintViolationException.class).isThrownBy(
                 () -> manageEmail.schedule(parameter)
@@ -397,6 +327,51 @@ class ManageEmailTest {
                                .replyToName("somebodyElse")
                                .build()
                 ).build();
+    }
+
+    private static EmailParameter getValidParameterWithInlineAttachment(
+            @Nullable String htmlBody,
+            EmailParameter.Email.Attachment... attachments
+    ) {
+        var emailBuilder = EmailParameter.Email.builder()
+                .subject("Example email subject")
+                .textBody("Email body")
+                .recipient("person1@example.com")
+                .fromAddress("somebody@aboutbits.it")
+                .fromName("somebody");
+
+        if (htmlBody != null) {
+            emailBuilder.htmlBody(htmlBody);
+        }
+        for (var attachment : attachments) {
+            emailBuilder.attachment(attachment);
+        }
+
+        return EmailParameter.builder()
+                .scheduledAt(OffsetDateTime.now())
+                .email(emailBuilder.build())
+                .build();
+    }
+
+    private static EmailParameter.Email.Attachment inlineAttachment(String contentId) {
+        return inlineAttachment(contentId, "logo.png");
+    }
+
+    private static EmailParameter.Email.Attachment inlineAttachment(String contentId, String fileName) {
+        return EmailParameter.Email.Attachment.builder()
+                .contentType("image/png")
+                .fileName(fileName)
+                .contentId(contentId)
+                .payload(new ByteArrayInputStream(new byte[]{1, 2, 3}))
+                .build();
+    }
+
+    private static EmailParameter.Email.Attachment regularAttachment(String fileName) {
+        return EmailParameter.Email.Attachment.builder()
+                .contentType("image/png")
+                .fileName(fileName)
+                .payload(new ByteArrayInputStream(new byte[]{1, 2, 3}))
+                .build();
     }
 
     private static List<MimeBodyPart> flattenParts(Object content) throws Exception {
