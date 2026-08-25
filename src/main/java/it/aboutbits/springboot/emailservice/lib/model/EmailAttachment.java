@@ -29,5 +29,7 @@ public class EmailAttachment {
 
     private String contentType;
 
+    private String contentId;
+
     private long fileReference;
 }

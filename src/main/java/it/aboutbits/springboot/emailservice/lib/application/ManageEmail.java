@@ -209,9 +209,17 @@ public class ManageEmail {
         }
 
         for (var attachment : attachments) {
-            var payload = attachmentDataSource.getAttachmentPayload(attachment.getFileReference());
-            helper.addAttachment(attachment.getFileName(), new ByteArrayResource(payload.readAllBytes()));
-            payload.close();
+            ByteArrayResource resource;
+            try (var payload = attachmentDataSource.getAttachmentPayload(attachment.getFileReference())) {
+                resource = new ByteArrayResource(payload.readAllBytes());
+            }
+
+            var contentId = attachment.getContentId();
+            if (contentId != null) {
+                helper.addInline(contentId, resource, attachment.getContentType());
+            } else {
+                helper.addAttachment(attachment.getFileName(), resource);
+            }
         }
 
         mailSender.send(message);
@@ -241,6 +249,7 @@ public class ManageEmail {
             var emailAttachment = new EmailAttachment();
             emailAttachment.setEmail(email);
             emailAttachment.setContentType(attachment.contentType());
+            emailAttachment.setContentId(attachment.contentId());
             emailAttachment.setFileName(attachment.fileName());
             emailAttachment.setFileReference(reference);
 
