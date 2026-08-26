@@ -22,6 +22,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.FileCopyUtils;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
@@ -183,6 +184,7 @@ public class ManageEmail {
             String replyToName,
             List<String> recipients,
             String subject,
+            @Nullable
             String htmlBody,
             String plainTextBody,
             Set<EmailAttachment> attachments
@@ -202,16 +204,23 @@ public class ManageEmail {
             }
         }
 
-        if (!htmlBody.isBlank()) {
+        if (htmlBody != null && !htmlBody.isBlank()) {
             helper.setText(plainTextBody, htmlBody);
         } else {
             helper.setText(plainTextBody);
         }
 
         for (var attachment : attachments) {
-            var payload = attachmentDataSource.getAttachmentPayload(attachment.getFileReference());
-            helper.addAttachment(attachment.getFileName(), new ByteArrayResource(payload.readAllBytes()));
-            payload.close();
+            var resource = new ByteArrayResource(FileCopyUtils.copyToByteArray(
+                    attachmentDataSource.getAttachmentPayload(attachment.getFileReference())
+            ));
+
+            var contentId = attachment.getContentId();
+            if (contentId != null) {
+                helper.addInline(contentId, attachment.getFileName(), resource, attachment.getContentType());
+            } else {
+                helper.addAttachment(attachment.getFileName(), resource, attachment.getContentType());
+            }
         }
 
         mailSender.send(message);
@@ -241,6 +250,7 @@ public class ManageEmail {
             var emailAttachment = new EmailAttachment();
             emailAttachment.setEmail(email);
             emailAttachment.setContentType(attachment.contentType());
+            emailAttachment.setContentId(attachment.contentId());
             emailAttachment.setFileName(attachment.fileName());
             emailAttachment.setFileReference(reference);
 
