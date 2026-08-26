@@ -11,7 +11,7 @@
 
     <groupId>it.aboutbits.springboot</groupId>
     <artifactId>emailservice</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <description>Spring Boot Email Service</description>
 
     <properties>
