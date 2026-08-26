@@ -34,6 +34,8 @@ public record EmailParameter(
             List<String> recipients,
 
             String textBody,
+
+            @Nullable
             String htmlBody,
 
             @NotBlank

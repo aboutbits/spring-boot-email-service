@@ -184,6 +184,7 @@ public class ManageEmail {
             String replyToName,
             List<String> recipients,
             String subject,
+            @Nullable
             String htmlBody,
             String plainTextBody,
             Set<EmailAttachment> attachments
@@ -203,7 +204,7 @@ public class ManageEmail {
             }
         }
 
-        if (!htmlBody.isBlank()) {
+        if (htmlBody != null && !htmlBody.isBlank()) {
             helper.setText(plainTextBody, htmlBody);
         } else {
             helper.setText(plainTextBody);
