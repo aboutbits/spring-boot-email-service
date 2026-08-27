@@ -9,10 +9,10 @@ import it.aboutbits.springboot.emailservice.lib.application.EmailAttachmentMappe
 import it.aboutbits.springboot.emailservice.lib.application.EmailMapper;
 import it.aboutbits.springboot.emailservice.lib.application.EmailMapperImpl;
 import it.aboutbits.springboot.emailservice.lib.application.EmailServiceMigrator;
+import it.aboutbits.springboot.emailservice.lib.application.JdbcAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.application.ManageEmail;
 import it.aboutbits.springboot.emailservice.lib.application.QueryEmail;
 import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
-import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Value;
@@ -96,7 +96,14 @@ public class EmailServiceConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(AttachmentDataSource.class)
-    public AttachmentDataSource attachmentDataSource() {
-        return new UnavailableAttachmentDataSource();
+    public JdbcAttachmentDataSource attachmentDataSource(
+            JdbcTemplate jdbcTemplate,
+            @Value("${aboutbits.emailservice.migrations.enabled:true}") boolean migrationsEnabled
+    ) {
+        var dataSource = new JdbcAttachmentDataSource(jdbcTemplate);
+        if (migrationsEnabled) {
+            dataSource.migrate();
+        }
+        return dataSource;
     }
 }
