@@ -9,6 +9,6 @@ import java.lang.annotation.Target;
 
 @Target({ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
-@Import({EmailServiceConfiguration.class})
+@Import({EmailServiceImportSelector.class})
 public @interface EnableEmailService {
 }

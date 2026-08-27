@@ -1,6 +1,7 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
 
+import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
 import it.aboutbits.springboot.emailservice.lib.EmailSchedulerCallback;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
 import lombok.extern.log4j.Log4j2;
@@ -20,6 +21,7 @@ public class SendScheduledEmails {
     private final QueryEmail queryEmail;
     private final ManageEmail manageEmail;
     private final List<EmailSchedulerCallback> callbacks;
+    private final EmailMetrics emailMetrics;
     private final Duration stuckSendingRecoveryThreshold;
 
     private long lastInfoLogMillis = System.currentTimeMillis();
@@ -30,16 +32,22 @@ public class SendScheduledEmails {
             QueryEmail queryEmail,
             ManageEmail manageEmail,
             List<EmailSchedulerCallback> callbacks,
+            EmailMetrics emailMetrics,
             Duration stuckSendingRecoveryThreshold
     ) {
         this.queryEmail = queryEmail;
         this.manageEmail = manageEmail;
         this.callbacks = callbacks;
+        this.emailMetrics = emailMetrics;
         this.stuckSendingRecoveryThreshold = stuckSendingRecoveryThreshold;
     }
 
     @Scheduled(initialDelayString = "${aboutbits.emailservice.scheduling.interval:30000}", fixedDelayString = "${aboutbits.emailservice.scheduling.interval:30000}")
     void sendEmails() {
+        emailMetrics.timedPass(EmailMetrics.Job.SEND, this::runPass);
+    }
+
+    private void runPass() {
         logStartOfPass();
 
         var staleSendingBefore = OffsetDateTime.now().minus(stuckSendingRecoveryThreshold);
@@ -94,6 +102,11 @@ public class SendScheduledEmails {
                     countError
             ));
         }
+
+        // Read last: after draining, so that in healthy operation the backlog sits at zero and only
+        // grows when the queue is genuinely not being kept up with, and after the callbacks, so that a
+        // failing read cannot cost them their report of a pass whose sends all went through.
+        emailMetrics.queue(queryEmail::queueSnapshot);
     }
 
     private void logStartOfPass() {
