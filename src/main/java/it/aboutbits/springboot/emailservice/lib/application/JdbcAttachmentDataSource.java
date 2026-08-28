@@ -19,9 +19,10 @@ public class JdbcAttachmentDataSource implements AttachmentDataSource {
 
     public JdbcAttachmentDataSource(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+        migrate();
     }
 
-    public void migrate() {
+    private void migrate() {
         log.info("EmailService: running attachment payload DB migrations...");
 
         jdbcTemplate.execute(

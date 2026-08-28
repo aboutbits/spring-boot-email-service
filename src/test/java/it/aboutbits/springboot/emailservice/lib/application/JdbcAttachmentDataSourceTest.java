@@ -1,12 +1,13 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
-import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import org.jspecify.annotations.NullMarked;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.ByteArrayInputStream;
 
@@ -19,11 +20,13 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 @NullMarked
 class JdbcAttachmentDataSourceTest {
     @Autowired
-    AttachmentDataSource attachmentDataSource;
+    JdbcTemplate jdbcTemplate;
 
-    @Test
-    void defaultAttachmentDataSource_shouldBeJdbcBased() {
-        assertThat(attachmentDataSource).isInstanceOf(JdbcAttachmentDataSource.class);
+    JdbcAttachmentDataSource attachmentDataSource;
+
+    @BeforeEach
+    void setup() {
+        attachmentDataSource = new JdbcAttachmentDataSource(jdbcTemplate);
     }
 
     @Test

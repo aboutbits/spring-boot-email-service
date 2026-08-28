@@ -9,15 +9,15 @@ import it.aboutbits.springboot.emailservice.lib.application.EmailAttachmentMappe
 import it.aboutbits.springboot.emailservice.lib.application.EmailMapper;
 import it.aboutbits.springboot.emailservice.lib.application.EmailMapperImpl;
 import it.aboutbits.springboot.emailservice.lib.application.EmailServiceMigrator;
-import it.aboutbits.springboot.emailservice.lib.application.JdbcAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.application.ManageEmail;
 import it.aboutbits.springboot.emailservice.lib.application.QueryEmail;
 import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
+import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -55,7 +55,7 @@ public class EmailServiceConfiguration {
     public ManageEmail manageEmail(
             EmailRepository emailRepository,
             JavaMailSender javaMailSender,
-            AttachmentDataSource attachmentDataSource,
+            ObjectProvider<AttachmentDataSource> attachmentDataSource,
             EmailMapper emailMapper,
             @Value("${aboutbits.emailservice.scheduling.max-attempts:3}") int maxAttempts,
             @Value("${aboutbits.emailservice.scheduling.interval:30000}") long schedulerIntervalMillis,
@@ -64,7 +64,7 @@ public class EmailServiceConfiguration {
         return new ManageEmail(
                 emailRepository,
                 javaMailSender,
-                attachmentDataSource,
+                attachmentDataSource.getIfAvailable(UnavailableAttachmentDataSource::new),
                 emailMapper,
                 maxAttempts,
                 Duration.ofMillis(schedulerIntervalMillis),
@@ -92,18 +92,5 @@ public class EmailServiceConfiguration {
             @Value("${aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold:PT30M}") Duration stuckCleanupRecoveryThreshold
     ) {
         return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks, stuckCleanupRecoveryThreshold);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(AttachmentDataSource.class)
-    public JdbcAttachmentDataSource attachmentDataSource(
-            JdbcTemplate jdbcTemplate,
-            @Value("${aboutbits.emailservice.migrations.enabled:true}") boolean migrationsEnabled
-    ) {
-        var dataSource = new JdbcAttachmentDataSource(jdbcTemplate);
-        if (migrationsEnabled) {
-            dataSource.migrate();
-        }
-        return dataSource;
     }
 }
