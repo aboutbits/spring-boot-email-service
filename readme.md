@@ -30,8 +30,6 @@ public AttachmentDataSource attachmentDataSource(JdbcTemplate jdbcTemplate) {
 }
 ```
 
-The `JdbcAttachmentDataSource` creates its table itself on construction, so no further setup is needed.
-
 #### Inline (CID) attachments
 
 To embed an attachment inline, set a `contentId` on the attachment and reference it in the `htmlBody` via the `cid:` scheme.
