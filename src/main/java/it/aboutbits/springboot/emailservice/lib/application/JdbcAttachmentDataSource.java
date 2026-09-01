@@ -18,8 +18,14 @@ public class JdbcAttachmentDataSource implements AttachmentDataSource {
     private final JdbcTemplate jdbcTemplate;
 
     public JdbcAttachmentDataSource(JdbcTemplate jdbcTemplate) {
+        this(jdbcTemplate, true);
+    }
+
+    public JdbcAttachmentDataSource(JdbcTemplate jdbcTemplate, boolean runMigrations) {
         this.jdbcTemplate = jdbcTemplate;
-        migrate();
+        if (runMigrations) {
+            migrate();
+        }
     }
 
     private void migrate() {

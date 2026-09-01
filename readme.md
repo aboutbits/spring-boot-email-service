@@ -30,6 +30,9 @@ public AttachmentDataSource attachmentDataSource(JdbcTemplate jdbcTemplate) {
 }
 ```
 
+By default, `JdbcAttachmentDataSource` creates its table on startup. If you prefer to manage the table yourself
+(e.g. via Liquibase), disable the built-in migration using the constructor-flag and create the table in your own migrations.
+
 #### Inline (CID) attachments
 
 To embed an attachment inline, set a `contentId` on the attachment and reference it in the `htmlBody` via the `cid:` scheme.
