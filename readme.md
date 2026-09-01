@@ -17,8 +17,21 @@ Add the mailer service to the classpath by adding the following maven dependency
 
 ### Attachments
 
-If you want to use attachments, you will have to create a bean implementing this interface: [AttachmentDataSource.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2FAttachmentDataSource.java)  
-This step is optional.
+If you want to use attachments, you will have to define a bean implementing this interface: [AttachmentDataSource.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2FAttachmentDataSource.java)  
+This step is optional. Where the payloads are stored is a decision of the application: you can provide your own
+implementation (e.g. S3), or register the ready-made `JdbcAttachmentDataSource` shipped with the library, which stores
+payloads in the lib-owned table `email_service_attachment_payloads`:
+
+```java
+
+@Bean
+public AttachmentDataSource attachmentDataSource(JdbcTemplate jdbcTemplate) {
+    return new JdbcAttachmentDataSource(jdbcTemplate);
+}
+```
+
+By default, `JdbcAttachmentDataSource` creates its table on startup. If you prefer to manage the table yourself
+(e.g. via Liquibase), disable the built-in migration using the constructor-flag and create the table in your own migrations.
 
 #### Inline (CID) attachments
 
