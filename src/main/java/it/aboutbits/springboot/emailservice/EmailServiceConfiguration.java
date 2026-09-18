@@ -116,4 +116,11 @@ public class EmailServiceConfiguration {
                 stuckCleanupRecoveryThreshold
         );
     }
+
+    // The EmailMetrics bean itself stays whatever the application sees - the library's own or a
+    // replacement - but nothing inside the library talks to it unguarded: an email that went out over
+    // SMTP has to be persisted as SENT no matter what a metrics backend does.
+    private static EmailMetrics failSafe(EmailMetrics emailMetrics) {
+        return new FailSafeEmailMetrics(emailMetrics);
+    }
 }

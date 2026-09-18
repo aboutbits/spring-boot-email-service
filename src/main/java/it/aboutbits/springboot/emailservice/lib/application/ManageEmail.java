@@ -111,10 +111,6 @@ public class ManageEmail {
             outcome = EmailMetrics.SendOutcome.ERROR;
         }
 
-        // Recorded before persisting: the attempt against the SMTP server happened either way, and a
-        // failure to write down its result is reported on the scheduler pass, not on the attempt. Safe
-        // to do here only because the sink is fail-safe (see FailSafeEmailMetrics): nothing between the
-        // send and the save may throw, or a delivered email stays unpersisted and is sent again.
         emailMetrics.sendAttempt(
                 EmailMetrics.SendMode.DIRECT,
                 outcome,
@@ -190,7 +186,14 @@ public class ManageEmail {
     // Actually release the attachment payloads of the claimed email.
     void completeClaimedCleanup(final Email email) throws AttachmentException {
         for (var attachment : email.getAttachments()) {
-            attachmentDataSource.releaseAttachment(attachment.getFileReference());
+            try {
+                attachmentDataSource.releaseAttachment(attachment.getFileReference());
+            } catch (AttachmentException e) {
+                // Counted here on top of the cleanup outcome the caller records, on purpose: the two answer
+                // different questions, whether the cleanup pass is healthy and whether the store is.
+                emailMetrics.attachmentError(EmailMetrics.AttachmentOperation.RELEASE);
+                throw e;
+            }
         }
         email.setAttachmentsCleaned(true);
         transactionTemplate.execute(_ -> emailRepository.save(email));
@@ -248,9 +251,19 @@ public class ManageEmail {
         }
 
         for (var attachment : attachments) {
-            var resource = new ByteArrayResource(FileCopyUtils.copyToByteArray(
-                    attachmentDataSource.getAttachmentPayload(attachment.getFileReference())
-            ));
+            // Only the store interaction is counted as an attachment error; a MIME failure while adding
+            // the payload to the message is a send failure like any other, and stays one.
+            byte[] payload;
+            try {
+                payload = FileCopyUtils.copyToByteArray(
+                        attachmentDataSource.getAttachmentPayload(attachment.getFileReference())
+                );
+            } catch (AttachmentException | IOException e) {
+                emailMetrics.attachmentError(EmailMetrics.AttachmentOperation.FETCH);
+                throw e;
+            }
+
+            var resource = new ByteArrayResource(payload);
 
             var contentId = attachment.getContentId();
             if (contentId != null) {
@@ -282,7 +295,15 @@ public class ManageEmail {
 
         var attachments = new HashSet<EmailAttachment>();
         for (var attachment : parameter.email().attachments()) {
-            var reference = attachmentDataSource.storeAttachmentPayload(attachment.payload());
+            long reference;
+            try {
+                reference = attachmentDataSource.storeAttachmentPayload(attachment.payload());
+            } catch (AttachmentException e) {
+                // The only failure on this path that no send attempt ever covers: it happens while the email
+                // is still being built, so without this counter it moves no series at all.
+                emailMetrics.attachmentError(EmailMetrics.AttachmentOperation.STORE);
+                throw e;
+            }
 
             var emailAttachment = new EmailAttachment();
             emailAttachment.setEmail(email);

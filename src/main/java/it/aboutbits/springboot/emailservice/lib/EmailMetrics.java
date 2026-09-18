@@ -15,7 +15,17 @@ import java.util.function.Supplier;
 public interface EmailMetrics {
     void sendAttempt(SendMode mode, SendOutcome outcome, Duration duration);
 
-    void cleanupAttempt(CleanupOutcome outcome, Duration duration);
+    // No duration: releasing attachment payloads is a delete, whose latency answers no question the
+    // outcome does not already answer. Counted, not timed.
+    void cleanupAttempt(CleanupOutcome outcome);
+
+    /*
+     * A failure of the attachment store itself, recorded on top of whatever the surrounding attempt is
+     * reported as. Worth its own series because an attachment that cannot be read is a permanent fault
+     * that the retry machinery treats exactly like a transient SMTP hiccup: without this, the two are
+     * indistinguishable on a dashboard, and a failure to store one is not covered by any attempt at all.
+     */
+    void attachmentError(AttachmentOperation operation);
 
     void pass(Job job, PassStatus status, Duration duration);
 
@@ -56,6 +66,13 @@ public interface EmailMetrics {
     enum CleanupOutcome {
         CLEANED,
         ERROR
+    }
+
+    // One constant per AttachmentDataSource method, so a reading points straight at the call that failed.
+    enum AttachmentOperation {
+        STORE,
+        FETCH,
+        RELEASE
     }
 
     enum Job {

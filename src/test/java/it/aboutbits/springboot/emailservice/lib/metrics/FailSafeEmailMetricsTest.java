@@ -34,6 +34,15 @@ class FailSafeEmailMetricsTest {
     }
 
     @Test
+    void givenAThrowingDelegate_attachmentError_shouldNotPropagateTheFailure() {
+        doThrow(new IllegalStateException("registry rejected the meter"))
+                .when(delegate).attachmentError(any());
+
+        assertThatCode(() -> sut.attachmentError(EmailMetrics.AttachmentOperation.STORE))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void givenAFailingSnapshot_queue_shouldNotPropagateTheFailure() {
         doThrow(new IllegalStateException("database unreachable"))
                 .when(delegate).queue(any());

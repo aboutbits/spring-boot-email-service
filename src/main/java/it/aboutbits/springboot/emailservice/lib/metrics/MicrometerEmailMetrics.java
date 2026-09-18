@@ -4,7 +4,6 @@ import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 
 import java.time.Duration;
@@ -18,12 +17,17 @@ import java.util.function.Supplier;
 /*
  * Series names are written out in Prometheus notation instead of Micrometer's dotted convention,
  * so that the name in this file is character for character the name a dashboard or an alert queries.
+ *
+ * The scheduler is tagged "scheduler" rather than job: job is a label Prometheus reserves for the
+ * scrape target - or, on the OTLP path, for the service name - and a metric label of that name is
+ * overwritten or renamed to exported_job on the way in.
  */
-@RequiredArgsConstructor
 @NullMarked
 public class MicrometerEmailMetrics implements EmailMetrics {
     private static final String SEND_METER = "app_email_send_duration";
-    private static final String CLEANUP_METER = "app_email_cleanup_duration";
+    // Counters are scraped with a _total suffix appended, the same way the timers get _seconds.
+    private static final String CLEANUP_METER = "app_email_cleanup_attempts";
+    private static final String ATTACHMENT_ERROR_METER = "app_email_attachment_errors";
     private static final String PASS_METER = "app_email_pass_duration";
     private static final String LAST_RUN_METER = "app_email_last_run_timestamp_seconds";
     private static final String LAST_SUCCESS_METER = "app_email_last_success_timestamp_seconds";
@@ -33,6 +37,43 @@ public class MicrometerEmailMetrics implements EmailMetrics {
     private final MeterRegistry meterRegistry;
     private final Map<GaugeId, AtomicLong> gauges = new ConcurrentHashMap<>();
 
+    public MicrometerEmailMetrics(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+        registerCountersUpFront();
+    }
+
+    /*
+     * Meters are otherwise created on first record, so a series a pod has never had a reason to write -
+     * every failure series, in healthy operation - is absent rather than zero, which a dashboard draws as
+     * "no data" and an alert cannot count. Unlike the timestamp gauges below, zero is a true reading here:
+     * nothing has failed yet. The gauges stay lazy on purpose, see setGauge.
+     */
+    private void registerCountersUpFront() {
+        for (var mode : SendMode.values()) {
+            for (var outcome : SendOutcome.values()) {
+                // Direct sends are never retried; the series would sit at zero forever and read as a lie.
+                if (mode == SendMode.DIRECT && outcome == SendOutcome.RETRY) {
+                    continue;
+                }
+                meterRegistry.timer(SEND_METER, "mode", tag(mode), "outcome", tag(outcome));
+            }
+        }
+
+        for (var outcome : CleanupOutcome.values()) {
+            meterRegistry.counter(CLEANUP_METER, "outcome", tag(outcome));
+        }
+
+        for (var operation : AttachmentOperation.values()) {
+            meterRegistry.counter(ATTACHMENT_ERROR_METER, "operation", tag(operation));
+        }
+
+        for (var job : Job.values()) {
+            for (var status : PassStatus.values()) {
+                meterRegistry.timer(PASS_METER, "scheduler", tag(job), "status", tag(status));
+            }
+        }
+    }
+
     @Override
     public void sendAttempt(SendMode mode, SendOutcome outcome, Duration duration) {
         meterRegistry.timer(SEND_METER, "mode", tag(mode), "outcome", tag(outcome))
@@ -40,23 +81,29 @@ public class MicrometerEmailMetrics implements EmailMetrics {
     }
 
     @Override
-    public void cleanupAttempt(CleanupOutcome outcome, Duration duration) {
-        meterRegistry.timer(CLEANUP_METER, "outcome", tag(outcome))
-                .record(duration);
+    public void cleanupAttempt(CleanupOutcome outcome) {
+        meterRegistry.counter(CLEANUP_METER, "outcome", tag(outcome))
+                .increment();
+    }
+
+    @Override
+    public void attachmentError(AttachmentOperation operation) {
+        meterRegistry.counter(ATTACHMENT_ERROR_METER, "operation", tag(operation))
+                .increment();
     }
 
     @Override
     public void pass(Job job, PassStatus status, Duration duration) {
-        meterRegistry.timer(PASS_METER, "job", tag(job), "status", tag(status))
+        meterRegistry.timer(PASS_METER, "scheduler", tag(job), "status", tag(status))
                 .record(duration);
 
         var now = Instant.now().getEpochSecond();
 
         // A pass that found nothing to do still stamps last_run: the scheduler did fire, which is what
         // last_run answers. Only last_success says the pass got through without hitting the database wall.
-        setGauge(LAST_RUN_METER, "job", tag(job), now);
+        setGauge(LAST_RUN_METER, "scheduler", tag(job), now);
         if (status == PassStatus.SUCCESS) {
-            setGauge(LAST_SUCCESS_METER, "job", tag(job), now);
+            setGauge(LAST_SUCCESS_METER, "scheduler", tag(job), now);
         }
     }
 

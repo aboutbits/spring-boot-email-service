@@ -18,7 +18,12 @@ public class NoOpEmailMetrics implements EmailMetrics {
     }
 
     @Override
-    public void cleanupAttempt(CleanupOutcome outcome, Duration duration) {
+    public void cleanupAttempt(CleanupOutcome outcome) {
+        // no metrics backend available
+    }
+
+    @Override
+    public void attachmentError(AttachmentOperation operation) {
         // no metrics backend available
     }
 

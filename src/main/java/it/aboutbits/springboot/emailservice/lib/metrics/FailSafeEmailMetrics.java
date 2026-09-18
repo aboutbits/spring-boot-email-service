@@ -27,8 +27,13 @@ public class FailSafeEmailMetrics implements EmailMetrics {
     }
 
     @Override
-    public void cleanupAttempt(CleanupOutcome outcome, Duration duration) {
-        record("cleanup attempt", () -> delegate.cleanupAttempt(outcome, duration));
+    public void cleanupAttempt(CleanupOutcome outcome) {
+        record("cleanup attempt", () -> delegate.cleanupAttempt(outcome));
+    }
+
+    @Override
+    public void attachmentError(AttachmentOperation operation) {
+        record("attachment error", () -> delegate.attachmentError(operation));
     }
 
     @Override

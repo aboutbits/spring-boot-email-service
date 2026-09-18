@@ -51,19 +51,19 @@ public class CleanupAttachmentFiles {
             }
             countClaimed++;
 
-            var startNanos = System.nanoTime();
             EmailMetrics.CleanupOutcome outcome;
 
             try {
                 manageEmail.completeClaimedCleanup(claimed.get());
                 countCleaned++;
                 outcome = EmailMetrics.CleanupOutcome.CLEANED;
-            } catch (Exception _) {
+            } catch (Exception e) {
                 countError++;
                 outcome = EmailMetrics.CleanupOutcome.ERROR;
+                log.error(JOB_DESCRIPTION + " | Failed to release the attachments of email: {}.", id, e);
             }
 
-            emailMetrics.cleanupAttempt(outcome, Duration.ofNanos(System.nanoTime() - startNanos));
+            emailMetrics.cleanupAttempt(outcome);
         }
 
         logEndOfPass(countCleaned, countError);

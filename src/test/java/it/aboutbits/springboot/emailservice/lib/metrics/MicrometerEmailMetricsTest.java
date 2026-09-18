@@ -50,20 +50,65 @@ class MicrometerEmailMetricsTest {
                 Duration.ofMillis(120)
         );
 
+        assertThat(meterRegistry.scrape()).contains("outcome=\"retry\"");
+
+        // Both series exist from the start, so the two are told apart by their count, not by presence.
+        assertThat(sendCount("scheduled", "retry")).isEqualTo(1);
+        assertThat(sendCount("scheduled", "error")).isZero();
+    }
+
+    /*
+     * The counterpart of givenNoPassHasRun below: an absent series reads as "no data" to a dashboard and
+     * cannot be counted by an alert, and for a counter that is a lie - nothing has failed yet is a zero.
+     * The timestamp gauges are the opposite case and stay absent.
+     */
+    @Test
+    void givenNothingHasFailedYet_theFailureSeries_shouldAlreadyBeExposedAsZero() {
         var scrape = meterRegistry.scrape();
 
-        assertThat(scrape).contains("outcome=\"retry\"");
-        assertThat(scrape).doesNotContain("outcome=\"error\"");
+        assertThat(scrape).contains("app_email_send_duration_seconds_count");
+        assertThat(scrape).contains("app_email_cleanup_attempts_total");
+        assertThat(scrape).contains("app_email_pass_duration_seconds_count");
+        assertThat(scrape).contains("app_email_attachment_errors_total");
+
+        assertThat(sendCount("scheduled", "sent")).isZero();
+        assertThat(sendCount("scheduled", "retry")).isZero();
+        assertThat(sendCount("scheduled", "error")).isZero();
+        assertThat(sendCount("direct", "sent")).isZero();
+        assertThat(sendCount("direct", "error")).isZero();
+    }
+
+    @Test
+    void givenDirectSendsAreNeverRetried_theirRetrySeries_shouldNotBeRegisteredAtAll() {
+        // A series that can only ever read zero would be a permanent flat line claiming to mean something.
+        assertThat(meterRegistry.find("app_email_send_duration")
+                           .tags("mode", "direct", "outcome", "retry")
+                           .timer()).isNull();
     }
 
     @Test
     void givenACleanedAttachment_cleanupAttempt_shouldExposeTheAttemptByOutcome() {
-        sut.cleanupAttempt(EmailMetrics.CleanupOutcome.CLEANED, Duration.ofMillis(30));
+        sut.cleanupAttempt(EmailMetrics.CleanupOutcome.CLEANED);
 
         var scrape = meterRegistry.scrape();
 
-        assertThat(scrape).contains("app_email_cleanup_duration_seconds_count");
+        assertThat(scrape).contains("app_email_cleanup_attempts_total");
         assertThat(scrape).contains("outcome=\"cleaned\"");
+    }
+
+    @Test
+    void givenAFailingAttachmentStore_attachmentError_shouldExposeTheFailedOperation() {
+        sut.attachmentError(EmailMetrics.AttachmentOperation.FETCH);
+
+        var scrape = meterRegistry.scrape();
+
+        // Counters are scraped with _total appended, which is why the constant carries no suffix itself.
+        assertThat(scrape).contains("app_email_attachment_errors_total");
+        assertThat(scrape).contains("operation=\"fetch\"");
+
+        assertThat(attachmentErrors("fetch")).isEqualTo(1d);
+        assertThat(attachmentErrors("store")).isZero();
+        assertThat(attachmentErrors("release")).isZero();
     }
 
     @Test
@@ -73,9 +118,9 @@ class MicrometerEmailMetricsTest {
         var scrape = meterRegistry.scrape();
 
         assertThat(scrape).contains("app_email_pass_duration_seconds_count");
-        assertThat(scrape).contains("job=\"send\"");
+        assertThat(scrape).contains("scheduler=\"send\"");
         assertThat(scrape).contains("status=\"success\"");
-        // The staleness alerts read these as "time() - max by (job) (...)", so no suffix may be appended.
+        // The staleness alerts read these as "time() - max by (scheduler) (...)", so no suffix may be appended.
         assertThat(scrape).contains("app_email_last_run_timestamp_seconds{");
         assertThat(scrape).contains("app_email_last_success_timestamp_seconds{");
     }
@@ -144,5 +189,19 @@ class MicrometerEmailMetricsTest {
 
     private double gauge(String name, String state) {
         return meterRegistry.get(name).tag("state", state).gauge().value();
+    }
+
+    private long sendCount(String mode, String outcome) {
+        return meterRegistry.get("app_email_send_duration")
+                .tags("mode", mode, "outcome", outcome)
+                .timer()
+                .count();
+    }
+
+    private double attachmentErrors(String operation) {
+        return meterRegistry.get("app_email_attachment_errors")
+                .tag("operation", operation)
+                .counter()
+                .count();
     }
 }
