@@ -76,6 +76,8 @@ public class EmailServiceMigrator {
 
                  alter table email_service_emails add column if not exists cleanup_start_time timestamp with time zone;
 
+                 alter table email_service_email_attachments add column if not exists content_id text;
+
                  update email_service_emails
                     set execution_end_time = sent_at
                   where sent_at is not null

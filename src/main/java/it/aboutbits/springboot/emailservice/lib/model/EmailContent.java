@@ -25,6 +25,8 @@ public record EmailContent(
         List<String> recipients,
 
         String textBody,
+
+        @Nullable
         String htmlBody
 ) {
 }

@@ -26,6 +26,8 @@ public record EmailDto(
         List<String> recipients,
 
         String textBody,
+
+        @Nullable
         String htmlBody,
 
         Set<EmailAttachmentDto> attachments,

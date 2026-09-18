@@ -1,119 +1,89 @@
 package it.aboutbits.springboot.emailservice;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
-import it.aboutbits.springboot.emailservice.lib.application.CleanupAttachmentFiles;
+import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
+import it.aboutbits.springboot.emailservice.lib.EmailState;
+import it.aboutbits.springboot.emailservice.lib.application.EmailParameter;
 import it.aboutbits.springboot.emailservice.lib.application.ManageEmail;
-import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
-import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
-import it.aboutbits.springboot.emailservice.lib.metrics.MicrometerEmailMetrics;
-import it.aboutbits.springboot.emailservice.lib.metrics.NoOpEmailMetrics;
+import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
+import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
+import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import org.jspecify.annotations.NullMarked;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.convert.ApplicationConversionService;
-import org.springframework.boot.test.context.FilteredClassLoader;
-import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ApplicationContext;
+
+import java.io.ByteArrayInputStream;
+import java.time.OffsetDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockingDetails;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
-/*
- * Wires the library the way an application does - through @EnableEmailService and nothing else. Nothing
- * here is component scanned, unlike in the @SpringBootTest suite, whose TestApplication happens to live in
- * the library's own package and would find any configuration class of the library on its own.
- */
+@SpringBootTest
+@WithPostgres
 @NullMarked
 class EmailServiceConfigurationTest {
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-            // What SpringApplication installs on its own and the library's Duration properties rely on.
-            .withInitializer(context -> context.getBeanFactory()
-                    .setConversionService(ApplicationConversionService.getSharedInstance()))
-            .withPropertyValues("aboutbits.emailservice.migrations.enabled=false")
-            .withBean(EmailRepository.class, () -> mock(EmailRepository.class))
-            .withBean(JavaMailSender.class, () -> mock(JavaMailSender.class))
-            .withBean(PlatformTransactionManager.class, () -> mock(PlatformTransactionManager.class));
+    @Autowired
+    ApplicationContext applicationContext;
+
+    @Autowired
+    ManageEmail manageEmail;
 
     @Test
-    void givenOnlyEnableEmailService_context_shouldWireEverySchedulerAndService() {
-        contextRunner
-                .withUserConfiguration(Application.class)
-                .run(context -> {
-                    assertThat(context.getStartupFailure()).isNull();
-                    assertThat(context.getBeansOfType(ManageEmail.class)).hasSize(1);
-                    assertThat(context.getBeansOfType(SendScheduledEmails.class)).hasSize(1);
-                    assertThat(context.getBeansOfType(CleanupAttachmentFiles.class)).hasSize(1);
-                    assertThat(context.getBeansOfType(EmailMetrics.class)).hasSize(1);
-                });
+    void givenNoAttachmentDataSourceBean_context_shouldStart() {
+        assertThat(applicationContext.getBeanNamesForType(AttachmentDataSource.class)).isEmpty();
+        assertThat(manageEmail).isNotNull();
     }
 
     @Test
-    void givenARegistry_emailMetrics_shouldRecordIntoMicrometer() {
-        contextRunner
-                .withUserConfiguration(Application.class)
-                .withBean(SimpleMeterRegistry.class)
-                .run(context -> assertThat(context.getBean(EmailMetrics.class))
-                        .isInstanceOf(MicrometerEmailMetrics.class));
+    void givenNoAttachmentDataSourceBean_scheduleWithoutAttachment_shouldSucceed() throws EmailException {
+        var result = manageEmail.schedule(getValidParameterWithoutAttachment());
+
+        assertThat(result.id()).isPositive();
+        assertThat(result.state()).isEqualTo(EmailState.PENDING);
     }
 
     @Test
-    void givenMicrometerWithoutARegistry_emailMetrics_shouldFallBackToTheNoOp() {
-        contextRunner
-                .withUserConfiguration(Application.class)
-                .run(context -> assertThat(context.getBean(EmailMetrics.class))
-                        .isInstanceOf(NoOpEmailMetrics.class));
+    void givenNoAttachmentDataSourceBean_scheduleWithAttachment_shouldFail() {
+        var parameter = getValidParameterWithAttachment();
+
+        assertThatExceptionOfType(EmailException.class).isThrownBy(
+                () -> manageEmail.schedule(parameter)
+        ).withCauseInstanceOf(AttachmentException.class);
     }
 
-    @Test
-    void givenSeveralRegistriesAndNoPrimaryOne_emailMetrics_shouldFallBackToTheNoOpInsteadOfFailing() {
-        contextRunner
-                .withUserConfiguration(Application.class)
-                .withBean("first", SimpleMeterRegistry.class)
-                .withBean("second", SimpleMeterRegistry.class)
-                .run(context -> {
-                    assertThat(context.getStartupFailure()).isNull();
-                    assertThat(context.getBean(EmailMetrics.class)).isInstanceOf(NoOpEmailMetrics.class);
-                });
+    private static EmailParameter getValidParameterWithoutAttachment() {
+        return EmailParameter.builder()
+                .scheduledAt(OffsetDateTime.now())
+                .email(EmailParameter.Email.builder()
+                               .subject("Example email subject")
+                               .textBody("Email body")
+                               .htmlBody("<h1>Html email body</h1>")
+                               .recipient("person1@example.com")
+                               .fromAddress("somebody@aboutbits.it")
+                               .fromName("somebody")
+                               .build()
+                ).build();
     }
 
-    @Test
-    void givenNoMicrometerOnTheClasspath_emailMetrics_shouldFallBackToTheNoOp() {
-        contextRunner
-                .withUserConfiguration(Application.class)
-                .withClassLoader(new FilteredClassLoader(MeterRegistry.class))
-                .run(context -> assertThat(context.getBean(EmailMetrics.class))
-                        .isInstanceOf(NoOpEmailMetrics.class));
-    }
-
-    @Test
-    void givenTheApplicationDeclaresItsOwnEmailMetrics_emailMetrics_shouldBeThatOneAlone() {
-        contextRunner
-                .withUserConfiguration(ApplicationWithOwnMetrics.class)
-                .withBean(SimpleMeterRegistry.class)
-                .run(context -> {
-                    assertThat(context.getBeansOfType(EmailMetrics.class)).hasSize(1);
-                    assertThat(mockingDetails(context.getBean(EmailMetrics.class)).isMock()).isTrue();
-                });
-    }
-
-    @Configuration(proxyBeanMethods = false)
-    @EnableEmailService
-    static class Application {
-    }
-
-    // The replacement sits in the very class carrying @EnableEmailService, the place an application
-    // would put it, and the one place a plain @Import would parse too late to see.
-    @Configuration(proxyBeanMethods = false)
-    @EnableEmailService
-    static class ApplicationWithOwnMetrics {
-        @Bean
-        EmailMetrics ownEmailMetrics() {
-            return mock(EmailMetrics.class);
-        }
+    private static EmailParameter getValidParameterWithAttachment() {
+        return EmailParameter.builder()
+                .scheduledAt(OffsetDateTime.now())
+                .email(EmailParameter.Email.builder()
+                               .subject("Example email subject")
+                               .textBody("Email body")
+                               .htmlBody("<h1>Html email body</h1>")
+                               .recipient("person1@example.com")
+                               .attachment(
+                                       EmailParameter.Email.Attachment.builder()
+                                               .contentType("image/png")
+                                               .fileName("x.png")
+                                               .payload(new ByteArrayInputStream(new byte[0]))
+                                               .build()
+                               )
+                               .fromAddress("somebody@aboutbits.it")
+                               .fromName("somebody")
+                               .build()
+                ).build();
     }
 }

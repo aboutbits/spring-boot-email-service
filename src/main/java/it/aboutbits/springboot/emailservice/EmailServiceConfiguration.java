@@ -17,9 +17,9 @@ import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmen
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.lib.metrics.FailSafeEmailMetrics;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -62,7 +62,7 @@ public class EmailServiceConfiguration {
     public ManageEmail manageEmail(
             EmailRepository emailRepository,
             JavaMailSender javaMailSender,
-            AttachmentDataSource attachmentDataSource,
+            ObjectProvider<AttachmentDataSource> attachmentDataSource,
             EmailMapper emailMapper,
             EmailMetrics emailMetrics,
             @Value("${aboutbits.emailservice.scheduling.max-attempts:3}") int maxAttempts,
@@ -72,7 +72,7 @@ public class EmailServiceConfiguration {
         return new ManageEmail(
                 emailRepository,
                 javaMailSender,
-                attachmentDataSource,
+                attachmentDataSource.getIfAvailable(UnavailableAttachmentDataSource::new),
                 emailMapper,
                 failSafe(emailMetrics),
                 maxAttempts,
@@ -115,18 +115,5 @@ public class EmailServiceConfiguration {
                 failSafe(emailMetrics),
                 stuckCleanupRecoveryThreshold
         );
-    }
-
-    @Bean
-    @ConditionalOnMissingBean(AttachmentDataSource.class)
-    public AttachmentDataSource attachmentDataSource() {
-        return new UnavailableAttachmentDataSource();
-    }
-
-    // The EmailMetrics bean itself stays whatever the application sees - the library's own or a
-    // replacement - but nothing inside the library talks to it unguarded: an email that went out over
-    // SMTP has to be persisted as SENT no matter what a metrics backend does.
-    private static EmailMetrics failSafe(EmailMetrics emailMetrics) {
-        return new FailSafeEmailMetrics(emailMetrics);
     }
 }
