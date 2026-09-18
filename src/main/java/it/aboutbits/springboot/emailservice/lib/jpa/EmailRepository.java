@@ -84,6 +84,24 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
             @Param("staleSendingBefore") OffsetDateTime staleSendingBefore
     );
 
+    // Backlog readings for the metrics, one round trip for all states asked for. States without a
+    // single row are simply absent from the result.
+    @Query("""
+            select e.state as state, count(e) as total from Email e
+                where e.state in :states
+                group by e.state
+            """)
+    List<StateCount> countByStateIn(@Param("states") Collection<EmailState> states);
+
+    // How far behind the queue is: the schedule time of the oldest email that is already due.
+    // Empty if nothing is waiting.
+    @Query("""
+            select min(e.scheduledAt) from Email e
+                where e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
+                    and e.scheduledAt < :now
+            """)
+    Optional<OffsetDateTime> findOldestDueScheduledAt(@Param("now") OffsetDateTime now);
+
     // Plain read, no locking -> two pods may see overlapping candidate sets.
     // The atomic UPDATE in claimForCleanup arbitrates the actual claim.
     // Includes rows whose cleanup was abandoned by a crashed pod (past the stale threshold).
@@ -118,4 +136,10 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
             @Param("now") OffsetDateTime now,
             @Param("staleCleanupBefore") OffsetDateTime staleCleanupBefore
     );
+
+    interface StateCount {
+        EmailState getState();
+
+        long getTotal();
+    }
 }
