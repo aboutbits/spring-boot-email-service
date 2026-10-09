@@ -1,6 +1,7 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
+import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
@@ -48,6 +49,10 @@ class ManageEmailTest {
 
     @MockitoBean
     AttachmentDataSource attachmentDataSource;
+
+    // Wrapped in a FailSafeEmailMetrics by the configuration, so the recordings still arrive here.
+    @MockitoBean
+    EmailMetrics emailMetrics;
 
     @Autowired
     private ManageEmail manageEmail;
@@ -272,6 +277,38 @@ class ManageEmailTest {
         assertThatExceptionOfType(EmailException.class).isThrownBy(
                 () -> manageEmail.sendOrFail(parameter)
         );
+    }
+
+    /*
+     * The store happens while the email is still being built, so no send attempt covers it: without its own
+     * counter this failure moves no series at all.
+     */
+    @Test
+    void givenAFailingAttachmentStore_schedule_shouldCountTheStoreError() throws AttachmentException {
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException());
+
+        var parameter = getValidParameterWithAttachment();
+
+        assertThatExceptionOfType(EmailException.class).isThrownBy(
+                () -> manageEmail.schedule(parameter)
+        );
+
+        verify(emailMetrics).attachmentError(EmailMetrics.AttachmentOperation.STORE);
+    }
+
+    // Counted on top of the send outcome, so a broken attachment store is not mistaken for a broken SMTP one.
+    @Test
+    void givenAnUnreadableAttachment_sendOrFail_shouldCountTheFetchError() throws AttachmentException {
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
+        when(attachmentDataSource.getAttachmentPayload(anyLong())).thenThrow(new AttachmentException());
+
+        var parameter = getValidParameterWithAttachment();
+
+        assertThatExceptionOfType(EmailException.class).isThrownBy(
+                () -> manageEmail.sendOrFail(parameter)
+        );
+
+        verify(emailMetrics).attachmentError(EmailMetrics.AttachmentOperation.FETCH);
     }
 
     @Test

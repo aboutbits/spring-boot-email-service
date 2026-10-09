@@ -92,6 +92,85 @@ To read email datasets from the database use this class: [QueryEmail.java](src%2
 
 If you want to receive a report after each run of the scheduler, create a Bean implementing [EmailSchedulerCallback.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2FEmailSchedulerCallback.java)
 
+### Metrics
+
+The library records Micrometer metrics for both schedulers. Micrometer is an optional dependency: if the
+application provides a `MeterRegistry` the metrics are recorded, otherwise the library falls back to a no-op
+and nothing changes. Nothing has to be enabled in this library.
+
+To scrape them, the application needs `spring-boot-starter-actuator` and `micrometer-registry-prometheus`,
+plus the Prometheus endpoint:
+
+```yaml
+management:
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+  endpoint:
+    health:
+      access: read-only
+    prometheus:
+      access: read-only
+```
+
+The following series are exposed:
+
+| Series                                          | Type    | Labels                                                                         | Description                                                                                     |
+|-------------------------------------------------|---------|--------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| `app_email_send_duration_seconds`               | timer   | `mode`: `scheduled`, `direct`<br/>`outcome`: `sent`, `retry`, `error`           | One observation per send attempt. `retry` is an attempt that failed but is scheduled for another one, `error` an email that has given up. |
+| `app_email_cleanup_attempts_total`              | counter | `outcome`: `cleaned`, `error`                                                   | One count per attachment cleanup attempt. Not timed: releasing payloads is a delete, whose latency answers nothing the outcome does not. |
+| `app_email_attachment_errors_total`             | counter | `operation`: `store`, `fetch`, `release`                                        | Failures of the attachment store itself, counted on top of the attempt they happened in. `store` happens while the email is still being built and is covered by no send attempt at all. Separates a broken attachment store from a broken SMTP server, which otherwise look identical. |
+| `app_email_pass_duration_seconds`               | timer   | `scheduler`: `send`, `cleanup`<br/>`status`: `success`, `failed`                      | One observation per scheduler pass. `failed` means the pass itself broke, e.g. the database was unreachable. |
+| `app_email_last_run_timestamp_seconds`          | gauge   | `scheduler`: `send`, `cleanup`                                                        | When the scheduler last fired. Stalls if the scheduler is dead or the pod is down.               |
+| `app_email_last_success_timestamp_seconds`      | gauge   | `scheduler`: `send`, `cleanup`                                                        | When a pass last got through. Stalls while passes keep failing.                                  |
+| `app_email_queue`                               | gauge   | `state`: `pending`, `sending`                                                   | Emails per state, read after each send pass. The terminal states `SENT` and `ERROR` are left out: they only ever grow. Errors are counted by `app_email_send_duration_seconds_count{outcome="error"}`. |
+| `app_email_queue_oldest_due_age_seconds`         | gauge   | `state`: `pending`                                                              | How long the oldest email that is already due has been waiting. `0` if nothing is due.           |
+
+Three things to keep in mind when querying them:
+
+- **Query the timers by their suffixed names.** A timer is scraped as `_seconds_count`, `_seconds_sum` and
+  `_seconds_max`; the counters are scraped as `_total`, which is why the table already spells them that way.
+  The bare timer name in the first column draws nothing on its own.
+- **Aggregate the gauges with `max`, never `sum`.** The queue gauges are read from the database, so every pod
+  reports the same numbers - summing them multiplies the backlog by the number of pods.
+- The queue gauges are only written by the send scheduler. With
+  `aboutbits.emailservice.scheduling.enabled=false` they are never registered, and the series are absent
+  rather than zero.
+
+The timers and the counters are registered at startup, so every one of their series is scraped from the first
+scrape on, reading `0` until something is recorded into it. A dashboard draws an absent series as *no data*
+and an alert cannot count it, and for a failure counter that would be wrong: nothing has failed yet is a
+reading, not a missing one. The one combination left out is `mode="direct"` with `outcome="retry"` - direct
+sends are never retried, so that series could only ever be a flat line pretending to mean something.
+
+Both timestamp gauges are the opposite case and are registered on first use, so a pod that has not completed a
+pass since starting has no series at all. This is deliberate too: an alert reads an absent series the same way
+it reads a `NaN` starting value, while a `0` starting value would look like decades of staleness after every
+deploy.
+
+The dashboards and alerts themselves belong to the consuming application, since they depend on how it is
+deployed. As a starting point, a scheduler that has stopped firing, a backlog that is not being kept up with,
+and emails stranded mid-send read as:
+
+```promql
+time() - max by (scheduler) (app_email_last_run_timestamp_seconds) > 300
+max(app_email_queue_oldest_due_age_seconds) > 600
+max(app_email_queue{state="sending"}) > 0
+```
+
+The last one needs a `for:` longer than `stuck-sending-recovery-threshold` to be meaningful. The queue is read
+after the pass has drained it, so a `sending` count that survives that long is an email whose result could not
+be persisted: it stays claimed until the threshold expires and is then sent a second time. Nothing else
+reports that - the send itself was recorded as `sent`, and the backlog gauge only counts `PENDING`.
+
+If the application replaces the metrics sink with its own `EmailMetrics` bean, the library's one steps back;
+whatever the application provides is called fail-safe, so a failing sink can never break a send.
+
 ### Configuration
 
 To enable this service just add `@EnableEmailService` to your main class. You must also enable `@EnableScheduling` to allow the email queue to be processed.

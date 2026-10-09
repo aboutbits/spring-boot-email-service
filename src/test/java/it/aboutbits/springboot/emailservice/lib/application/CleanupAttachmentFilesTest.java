@@ -2,6 +2,7 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentCleanerCallback;
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
+import it.aboutbits.springboot.emailservice.lib.EmailMetrics;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
@@ -43,6 +44,10 @@ class CleanupAttachmentFilesTest {
 
     @MockitoBean
     AttachmentCleanerCallback attachmentCleanerCallback;
+
+    // Wrapped in a FailSafeEmailMetrics by the configuration, so the recordings still arrive here.
+    @MockitoBean
+    EmailMetrics emailMetrics;
 
     @Autowired
     EmailRepository emailRepository;
@@ -97,6 +102,10 @@ class CleanupAttachmentFilesTest {
                     assertThat(reloaded.getCleanupStartTime()).isNotNull();
                 });
         verify(attachmentCleanerCallback).report(new AttachmentCleanerCallback.Report(1, 0, 1));
+
+        // Counted twice on purpose: once as a failed cleanup attempt, once as a failure of the store itself.
+        verify(emailMetrics).cleanupAttempt(EmailMetrics.CleanupOutcome.ERROR);
+        verify(emailMetrics).attachmentError(EmailMetrics.AttachmentOperation.RELEASE);
     }
 
     @Test
