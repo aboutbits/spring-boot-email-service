@@ -30,12 +30,14 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 
 import java.io.ByteArrayInputStream;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
@@ -318,6 +320,64 @@ class ManageEmailTest {
     }
 
     @Test
+    void givenNoActiveTransaction_sendAsync_shouldFail() {
+        var email = getValidParameterWithoutAttachment().email();
+
+        assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
+                () -> manageEmail.sendAsync(email)
+        );
+
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+        assertThat(emailRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void givenCommittingTransaction_sendAsync_shouldSendRightAfterCommit() throws EmailException {
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment().email());
+
+        // Nothing leaves before the commit: the email is handed over only once the caller's data is committed
+        assertThat(result.state()).isEqualTo(EmailState.PENDING);
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+
+        transactionManager.commit(transaction);
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(emailRepository.findById(result.id()))
+                        .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.SENT))
+        );
+        verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenRollingBackTransaction_sendAsync_shouldNeitherPersistNorSend() throws EmailException {
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment().email());
+        transactionManager.rollback(transaction);
+
+        assertThat(emailRepository.findById(result.id())).isEmpty();
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenMailSenderError_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
+        doThrow(new MailSendException("any")).when(javaMailSender).send(any(MimeMessage.class));
+
+        var result = sendAsyncInTransaction(getValidParameterWithoutAttachment().email());
+
+        // One failed attempt, then back to PENDING with a backoff, exactly like a failed scheduler attempt
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(emailRepository.findById(result.id())).hasValueSatisfying(email -> {
+                    assertThat(email.getAttempts()).isEqualTo(1);
+                    assertThat(email.getState()).isEqualTo(EmailState.PENDING);
+                    assertThat(email.getScheduledAt()).isAfter(OffsetDateTime.now());
+                    assertThat(email.getErrorMessage()).isNotBlank();
+                })
+        );
+        verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
     void givenAttachmentError_sendOrFail_shouldFail() throws EmailException, AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException());
 
@@ -347,6 +407,19 @@ class ManageEmailTest {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
             var result = manageEmail.schedule(parameter);
+            transactionManager.commit(transaction);
+            return result;
+        } catch (EmailException | RuntimeException e) {
+            transactionManager.rollback(transaction);
+            throw e;
+        }
+    }
+
+    // sendAsync() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
+    private EmailDto sendAsyncInTransaction(EmailParameter.Email email) throws EmailException {
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        try {
+            var result = manageEmail.sendAsync(email);
             transactionManager.commit(transaction);
             return result;
         } catch (EmailException | RuntimeException e) {

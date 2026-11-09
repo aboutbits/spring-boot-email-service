@@ -11,6 +11,7 @@ import it.aboutbits.springboot.emailservice.lib.application.EmailMapperImpl;
 import it.aboutbits.springboot.emailservice.lib.application.EmailServiceMigrator;
 import it.aboutbits.springboot.emailservice.lib.application.ManageEmail;
 import it.aboutbits.springboot.emailservice.lib.application.QueryEmail;
+import it.aboutbits.springboot.emailservice.lib.application.SendAsyncEmails;
 import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
 import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -52,6 +54,7 @@ public class EmailServiceConfiguration {
     }
 
     @Bean
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public ManageEmail manageEmail(
             EmailRepository emailRepository,
             JavaMailSender javaMailSender,
@@ -59,7 +62,8 @@ public class EmailServiceConfiguration {
             EmailMapper emailMapper,
             @Value("${aboutbits.emailservice.scheduling.max-attempts:3}") int maxAttempts,
             @Value("${aboutbits.emailservice.scheduling.interval:30000}") long schedulerIntervalMillis,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            ApplicationEventPublisher eventPublisher
     ) {
         return new ManageEmail(
                 emailRepository,
@@ -68,8 +72,19 @@ public class EmailServiceConfiguration {
                 emailMapper,
                 maxAttempts,
                 Duration.ofMillis(schedulerIntervalMillis),
-                transactionManager
+                transactionManager,
+                eventPublisher
         );
+    }
+
+    @Bean(destroyMethod = "shutdown")
+    @ConditionalOnProperty(value = "aboutbits.emailservice.async-dispatch.enabled", matchIfMissing = true)
+    public SendAsyncEmails sendAsyncEmails(
+            ManageEmail manageEmail,
+            @Value("${aboutbits.emailservice.async-dispatch.threads:1}") int threads,
+            @Value("${aboutbits.emailservice.async-dispatch.queue-capacity:100}") int queueCapacity
+    ) {
+        return new SendAsyncEmails(manageEmail, threads, queueCapacity);
     }
 
     @Bean

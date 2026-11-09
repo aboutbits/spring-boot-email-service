@@ -42,7 +42,7 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
     // Includes SENDING rows abandoned by crashed pods (past the stale threshold).
     @Query("""
             select e.id from Email e
-                where e.scheduledAt < :now
+                where e.scheduledAt <= :now
                     and (
                         e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
                         or (
@@ -69,7 +69,7 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
                    e.errorMessage = null,
                    e.attempts = e.attempts + 1
                where e.id = :id
-                   and e.scheduledAt < :now
+                   and e.scheduledAt <= :now
                    and (
                        e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
                        or (
@@ -82,6 +82,25 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
             @Param("id") long id,
             @Param("now") OffsetDateTime now,
             @Param("staleSendingBefore") OffsetDateTime staleSendingBefore
+    );
+
+    // Same compare-and-set as claimForSend, restricted to a due PENDING row. Used by the after-commit dispatch,
+    // which only ever claims the row it just inserted and must not take part in stale-SENDING recovery.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Email e
+               set e.state = it.aboutbits.springboot.emailservice.lib.EmailState.SENDING,
+                   e.executionStartTime = :now,
+                   e.executionEndTime = null,
+                   e.errorMessage = null,
+                   e.attempts = e.attempts + 1
+               where e.id = :id
+                   and e.scheduledAt <= :now
+                   and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
+            """)
+    int claimPendingForSend(
+            @Param("id") long id,
+            @Param("now") OffsetDateTime now
     );
 
     // Plain read, no locking -> two pods may see overlapping candidate sets.

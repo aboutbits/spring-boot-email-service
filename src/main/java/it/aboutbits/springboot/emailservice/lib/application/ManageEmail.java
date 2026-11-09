@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -46,7 +47,9 @@ public class ManageEmail {
     private final int maxAttempts;
     private final Duration schedulerInterval;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public ManageEmail(
             EmailRepository emailRepository,
             JavaMailSender mailSender,
@@ -54,7 +57,8 @@ public class ManageEmail {
             EmailMapper emailMapper,
             int maxAttempts,
             Duration schedulerInterval,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
@@ -62,6 +66,7 @@ public class ManageEmail {
         this.emailMapper = emailMapper;
         this.maxAttempts = maxAttempts;
         this.schedulerInterval = schedulerInterval;
+        this.eventPublisher = eventPublisher;
         // Persist the final email state in its own, independent transaction to never make it roll back
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -81,12 +86,46 @@ public class ManageEmail {
     public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
-            email = fromParameter(parameter);
+            email = fromParameter(parameter.scheduledAt(), parameter.email());
         } catch (AttachmentException e) {
             throw new EmailException(e);
         }
 
         var savedEmail = emailRepository.save(email);
+
+        return emailMapper.toDto(savedEmail);
+    }
+
+    /**
+     * Persists the email as {@link EmailState#PENDING} in the caller's transaction and sends it right after that
+     * transaction commits. The caller never waits for the SMTP round-trip.
+     * <p>
+     * Must be called from within an active transaction: the email row and the attachment payloads
+     * are written in the caller's transaction, so they commit and roll back together with the caller's own data.
+     * Calling this method without an active transaction fails with an
+     * {@link org.springframework.transaction.IllegalTransactionStateException}.
+     * <p>
+     * After the commit, the email id is handed to a bounded executor that claims the row with the same kind of
+     * atomic update as the scheduler, so it is never sent twice. If the hand-off is lost (saturated executor, pod
+     * restart) or the send fails, the scheduler picks the email up and retries it like any scheduled email. With
+     * {@code aboutbits.emailservice.async-dispatch.enabled=false} (recommended for tests) nothing is dispatched and
+     * the scheduler alone sends the email.
+     *
+     * @return the stored email, in state {@link EmailState#PENDING}
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public EmailDto sendAsync(@Valid EmailParameter.Email email) throws EmailException {
+        Email entity;
+        try {
+            entity = fromParameter(OffsetDateTime.now(), email);
+        } catch (AttachmentException e) {
+            throw new EmailException(e);
+        }
+
+        var savedEmail = emailRepository.save(entity);
+
+        // Consumed by SendAsyncEmails after the commit; ignored when the async dispatch is disabled.
+        eventPublisher.publishEvent(new AsyncEmailQueued(savedEmail.getId()));
 
         return emailMapper.toDto(savedEmail);
     }
@@ -103,7 +142,8 @@ public class ManageEmail {
      * <p>
      * Use this only when the email is not tied to a database write,
      * i.e. when the email and the caller's data need not stay consistent with each other.
-     * Otherwise, use {@link #schedule(EmailParameter)} inside the transaction that writes the data.
+     * Otherwise, use {@link #sendAsync(EmailParameter.Email)} or {@link #schedule(EmailParameter)} inside the
+     * transaction that writes the data.
      *
      * @return the stored email, in state {@link EmailState#SENT}
      */
@@ -111,7 +151,7 @@ public class ManageEmail {
     public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
-            email = fromParameter(parameter);
+            email = fromParameter(parameter.scheduledAt(), parameter.email());
         } catch (AttachmentException e) {
             throw new EmailException(e);
         }
@@ -144,6 +184,14 @@ public class ManageEmail {
     @Transactional
     Optional<Email> tryClaimForSend(long id, OffsetDateTime staleSendingBefore) {
         var claimed = emailRepository.claimForSend(id, OffsetDateTime.now(), staleSendingBefore);
+        return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
+    }
+
+    // Like tryClaimForSend, but never takes over a stale SENDING row: the after-commit dispatch only claims the row
+    // it just inserted, and recovering rows abandoned by a crashed pod is the scheduler's job.
+    @Transactional
+    Optional<Email> tryClaimPendingForSend(long id) {
+        var claimed = emailRepository.claimPendingForSend(id, OffsetDateTime.now());
         return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
     }
 
@@ -255,12 +303,10 @@ public class ManageEmail {
         mailSender.send(message);
     }
 
-    private Email fromParameter(EmailParameter parameter) throws AttachmentException {
-        var emailData = parameter.email();
-
+    private Email fromParameter(OffsetDateTime scheduledAt, EmailParameter.Email emailData) throws AttachmentException {
         var email = new Email();
         email.setState(EmailState.PENDING);
-        email.setScheduledAt(parameter.scheduledAt());
+        email.setScheduledAt(scheduledAt);
         email.setContent(new EmailContent(
                 emailData.subject(),
                 emailData.fromAddress(),
@@ -273,7 +319,7 @@ public class ManageEmail {
         ));
 
         var attachments = new HashSet<EmailAttachment>();
-        for (var attachment : parameter.email().attachments()) {
+        for (var attachment : emailData.attachments()) {
             var reference = attachmentDataSource.storeAttachmentPayload(attachment.payload());
 
             var emailAttachment = new EmailAttachment();
