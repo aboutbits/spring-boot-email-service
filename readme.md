@@ -65,6 +65,11 @@ Use the `ManageEmail` service to schedule an email.
 the email row is written in the caller's transaction, so it commits and rolls back together with the data
 that triggered it. Calling it without an active transaction throws an `IllegalTransactionStateException`.
 
+`sendOrFail` sends the email at once, in a single attempt, and throws an `EmailException` if the send fails.
+It must be called outside any transaction (`@Transactional(propagation = NEVER)`), otherwise the SMTP round-trip
+runs while the caller's database connection is held and a second connection is needed to persist the outcome, which
+can exhaust the connection pool under load. Use it only when no data depends on the email being sent.
+
 #### Example
 
 ```java
