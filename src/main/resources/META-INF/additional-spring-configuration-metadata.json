@@ -37,6 +37,24 @@
             "defaultValue": "PT30M"
         },
         {
+            "name": "aboutbits.emailservice.async-dispatch.enabled",
+            "type": "java.lang.Boolean",
+            "description": "Sends emails queued via ManageEmail.sendAsync right after the caller's transaction committed, on a bounded executor. When disabled, such emails are sent by the scheduler only; recommended for tests.",
+            "defaultValue": true
+        },
+        {
+            "name": "aboutbits.emailservice.async-dispatch.threads",
+            "type": "java.lang.Integer",
+            "description": "Number of threads of the executor sending emails right after commit, i.e. how many SMTP sends run in parallel per pod. The default of one matches the scheduler, which sends sequentially.",
+            "defaultValue": 1
+        },
+        {
+            "name": "aboutbits.emailservice.async-dispatch.queue-capacity",
+            "type": "java.lang.Integer",
+            "description": "Maximum number of emails waiting for a thread of the after-commit executor. When the queue is full, the hand-off is dropped and the scheduler sends the email instead.",
+            "defaultValue": 100
+        },
+        {
             "name": "aboutbits.emailservice.scheduling.max-attempts",
             "type": "java.lang.Integer",
             "description": "Maximum number of send attempts before an email is marked as ERROR. Applies to the scheduled retry loop; the synchronous sendOrFail path is fail-fast and does not retry. Failed attempts are retried with exponential backoff (scheduling.interval x 2^attempts); with the defaults a persistently failing email runs attempt 1 -> +60s -> attempt 2 -> +120s -> attempt 3 -> ERROR.",
