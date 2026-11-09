@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -297,6 +298,23 @@ class ManageEmailTest {
         transactionManager.rollback(transaction);
 
         assertThat(emailRepository.findById(result.id())).isEmpty();
+    }
+
+    @Test
+    void givenActiveTransaction_sendOrFail_shouldFail() {
+        var parameter = getValidParameterWithoutAttachment();
+
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        try {
+            assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
+                    () -> manageEmail.sendOrFail(parameter)
+            );
+        } finally {
+            transactionManager.rollback(transaction);
+        }
+
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+        assertThat(emailRepository.findAll()).isEmpty();
     }
 
     @Test

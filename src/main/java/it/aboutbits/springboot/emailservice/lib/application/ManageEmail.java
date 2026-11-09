@@ -91,6 +91,23 @@ public class ManageEmail {
         return emailMapper.toDto(savedEmail);
     }
 
+    /**
+     * Sends the email at once, in a single attempt, and persists the outcome. The caller waits for the SMTP round-trip.
+     * If the send fails, the email is stored as {@link EmailState#ERROR},
+     * is not retried, and an {@link EmailException} is thrown.
+     * <p>
+     * Must be called outside any transaction. Inside one, the SMTP round-trip would run while the caller's database
+     * connection is held, and persisting the outcome would need a second connection at the same time.
+     * Calling this method within an active transaction fails with an
+     * {@link org.springframework.transaction.IllegalTransactionStateException}.
+     * <p>
+     * Use this only when the email is not tied to a database write,
+     * i.e. when the email and the caller's data need not stay consistent with each other.
+     * Otherwise, use {@link #schedule(EmailParameter)} inside the transaction that writes the data.
+     *
+     * @return the stored email, in state {@link EmailState#SENT}
+     */
+    @Transactional(propagation = Propagation.NEVER)
     public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
