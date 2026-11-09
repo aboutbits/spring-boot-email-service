@@ -20,6 +20,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.FileCopyUtils;
@@ -66,6 +67,17 @@ public class ManageEmail {
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    /**
+     * Persists the email as {@link EmailState#PENDING} to be sent by the scheduler at {@code parameter.scheduledAt()}.
+     * <p>
+     * Must be called from within an active transaction: the email row and the attachment payloads
+     * are written in the caller's transaction, so they commit and roll back together with the caller's own data.
+     * Calling this method without an active transaction fails with an
+     * {@link org.springframework.transaction.IllegalTransactionStateException}.
+     *
+     * @return the stored email, in state {@link EmailState#PENDING}
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
     public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {

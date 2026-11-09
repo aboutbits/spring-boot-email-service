@@ -1,9 +1,11 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
+import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
+import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import jakarta.mail.Part;
 import jakarta.mail.internet.MimeBodyPart;
@@ -23,6 +25,9 @@ import org.springframework.mail.MailSendException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 
 import java.io.ByteArrayInputStream;
 import java.time.OffsetDateTime;
@@ -52,6 +57,12 @@ class ManageEmailTest {
     @Autowired
     private ManageEmail manageEmail;
 
+    @Autowired
+    private EmailRepository emailRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
     @BeforeEach
     void setup() {
         doNothing().when(javaMailSender).send(any(MimeMessage.class));
@@ -61,7 +72,7 @@ class ManageEmailTest {
     void givenRequiredParameters_schedule_shouldCreateNewNotification() throws EmailException {
         var parameter = getValidParameterWithoutAttachment();
 
-        var result = manageEmail.schedule(parameter);
+        var result = scheduleInTransaction(parameter);
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
@@ -83,7 +94,7 @@ class ManageEmailTest {
 
         var parameter = getValidParameterWithAttachment();
 
-        var result = manageEmail.schedule(parameter);
+        var result = scheduleInTransaction(parameter);
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
@@ -172,7 +183,7 @@ class ManageEmailTest {
                 inlineAttachment("header-logo")
         );
 
-        var result = manageEmail.schedule(parameter);
+        var result = scheduleInTransaction(parameter);
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
@@ -229,7 +240,7 @@ class ManageEmailTest {
                 inlineAttachment("header-logo")
         );
 
-        var result = manageEmail.schedule(parameter);
+        var result = scheduleInTransaction(parameter);
 
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
     }
@@ -246,7 +257,7 @@ class ManageEmailTest {
         var parameter = getValidParameterWithInlineAttachment(htmlBody, inlineAttachment(contentId));
 
         assertThatExceptionOfType(ConstraintViolationException.class).isThrownBy(
-                () -> manageEmail.schedule(parameter)
+                () -> scheduleInTransaction(parameter)
         );
     }
 
@@ -259,8 +270,33 @@ class ManageEmailTest {
         );
 
         assertThatExceptionOfType(ConstraintViolationException.class).isThrownBy(
+                () -> scheduleInTransaction(parameter)
+        );
+    }
+
+    @Test
+    void givenNoActiveTransaction_schedule_shouldFail() {
+        var parameter = getValidParameterWithoutAttachment();
+
+        assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
                 () -> manageEmail.schedule(parameter)
         );
+    }
+
+    @Test
+    void givenCommittingTransaction_schedule_shouldPersistEmail() throws EmailException {
+        var result = scheduleInTransaction(getValidParameterWithoutAttachment());
+
+        assertThat(emailRepository.findById(result.id())).isPresent();
+    }
+
+    @Test
+    void givenRollingBackTransaction_schedule_shouldNotPersistEmail() throws EmailException {
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        var result = manageEmail.schedule(getValidParameterWithoutAttachment());
+        transactionManager.rollback(transaction);
+
+        assertThat(emailRepository.findById(result.id())).isEmpty();
     }
 
     @Test
@@ -286,6 +322,19 @@ class ManageEmailTest {
         assertThatExceptionOfType(EmailException.class).isThrownBy(
                 () -> manageEmail.sendOrFail(parameter)
         );
+    }
+
+    // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
+    private EmailDto scheduleInTransaction(EmailParameter parameter) throws EmailException {
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        try {
+            var result = manageEmail.schedule(parameter);
+            transactionManager.commit(transaction);
+            return result;
+        } catch (EmailException | RuntimeException e) {
+            transactionManager.rollback(transaction);
+            throw e;
+        }
     }
 
     private static EmailParameter getValidParameterWithoutAttachment() {
