@@ -30,8 +30,7 @@ public AttachmentDataSource attachmentDataSource(JdbcTemplate jdbcTemplate) {
 }
 ```
 
-By default, `JdbcAttachmentDataSource` creates its table on startup. If you prefer to manage the table yourself
-(e.g. via Liquibase), disable the built-in migration using the constructor-flag and create the table in your own migrations.
+By default, `JdbcAttachmentDataSource` creates its table on startup. If you prefer to manage the table yourself (e.g. via Liquibase), disable the built-in migration using the constructor-flag and create the table in your own migrations.
 
 #### Inline (CID) attachments
 
@@ -62,10 +61,15 @@ in the `htmlBody` as `cid:contentId`, otherwise validation fails.
 
 Use the `ManageEmail` service to schedule an email.
 
+`schedule` must be called from within an active transaction (`@Transactional(propagation = MANDATORY)`):
+the email row is written in the caller's transaction, so it commits and rolls back together with the data
+that triggered it. Calling it without an active transaction throws an `IllegalTransactionStateException`.
+
 #### Example
 
 ```java
 // @formatter:off
+@Transactional
 public void sendMail(final String to,final String subject,final String htmlBody,final String plainTextBody) {
         manageEmail.schedule(
                 EmailParameter.builder()
