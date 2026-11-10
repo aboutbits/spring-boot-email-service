@@ -16,6 +16,7 @@ import it.aboutbits.springboot.emailservice.lib.application.SendScheduledEmails;
 import it.aboutbits.springboot.emailservice.lib.application.UnavailableAttachmentDataSource;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfigurationPackage;
@@ -107,5 +108,10 @@ public class EmailServiceConfiguration {
             @Value("${aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold:PT30M}") Duration stuckCleanupRecoveryThreshold
     ) {
         return new CleanupAttachmentFiles(queryEmail, manageEmail, callbacks, stuckCleanupRecoveryThreshold);
+    }
+
+    @Bean
+    public EmailServiceStartupCheck emailServiceStartupCheck(ListableBeanFactory beanFactory) {
+        return new EmailServiceStartupCheck(beanFactory);
     }
 }

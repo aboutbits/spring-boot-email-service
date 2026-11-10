@@ -33,7 +33,7 @@ import static org.mockito.Mockito.verify;
 
 @SpringBootTest(properties = {
         "aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold=PT5M",
-        "aboutbits.emailservice.scheduling.interval=30000"
+        "aboutbits.emailservice.scheduling.interval=3600000"
 })
 @WithPostgres
 @NullMarked
