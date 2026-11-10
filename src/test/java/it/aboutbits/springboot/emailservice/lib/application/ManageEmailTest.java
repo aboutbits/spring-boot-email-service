@@ -15,6 +15,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -419,6 +420,28 @@ class ManageEmailTest {
         assertThatExceptionOfType(EmailException.class).isThrownBy(
                 () -> manageEmail.sendOrFail(parameter)
         );
+    }
+
+    @Nested
+    @SpringBootTest(properties = "aboutbits.emailservice.async-dispatch.enabled=false")
+    @WithPostgres
+    class SendAsync {
+        @Test
+        void givenAsyncDispatchDisabled_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
+            var result = sendAsyncInTransaction(getValidParameterWithoutAttachment().email());
+
+            // Nothing is dispatched after the commit
+            assertThat(emailRepository.findById(result.id()))
+                    .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.PENDING));
+            verify(javaMailSender, never()).send(any(MimeMessage.class));
+
+            // The scheduler sends it on its next pass
+            sendScheduledEmails.sendEmails();
+
+            assertThat(emailRepository.findById(result.id()))
+                    .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.SENT));
+            verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+        }
     }
 
     // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
