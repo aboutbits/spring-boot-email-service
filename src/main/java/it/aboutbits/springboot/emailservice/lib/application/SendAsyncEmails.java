@@ -4,6 +4,7 @@ import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.slf4j.MDC;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -29,6 +30,12 @@ public class SendAsyncEmails {
     private final ThreadPoolTaskExecutor executor;
 
     public SendAsyncEmails(ManageEmail manageEmail, int threads, int queueCapacity) {
+        if (threads < 1) {
+            throw new IllegalArgumentException("async-dispatch.threads must be at least 1, got " + threads);
+        }
+        if (queueCapacity < 1) {
+            throw new IllegalArgumentException("async-dispatch.queue-capacity must be at least 1, got " + queueCapacity);
+        }
         this.manageEmail = manageEmail;
 
         // Bounded on purpose: when saturated, the hand-off is rejected and the scheduler sends the email instead.
@@ -37,6 +44,21 @@ public class SendAsyncEmails {
         this.executor.setMaxPoolSize(threads);
         this.executor.setQueueCapacity(queueCapacity);
         this.executor.setThreadNamePrefix("email-async-");
+        // Carry the caller's MDC onto the worker, so the send can be correlated with
+        // the request that queued the email.
+        this.executor.setTaskDecorator(task -> {
+            var context = MDC.getCopyOfContextMap();
+            return () -> {
+                if (context != null) {
+                    MDC.setContextMap(context);
+                }
+                try {
+                    task.run();
+                } finally {
+                    MDC.clear();
+                }
+            };
+        });
         this.executor.setWaitForTasksToCompleteOnShutdown(true);
         this.executor.setAwaitTerminationSeconds(AWAIT_TERMINATION_SECONDS);
         this.executor.initialize();

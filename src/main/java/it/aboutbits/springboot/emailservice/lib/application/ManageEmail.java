@@ -75,8 +75,9 @@ public class ManageEmail {
     /**
      * Persists the email as {@link EmailState#PENDING} to be sent by the scheduler at {@code parameter.scheduledAt()}.
      * <p>
-     * Must be called from within an active transaction: the email row and the attachment payloads
-     * are written in the caller's transaction, so they commit and roll back together with the caller's own data.
+     * Must be called from within an active transaction: the email row is written in the caller's transaction, so
+     * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
+     * with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the transaction itself.
      * Calling this method without an active transaction fails with an
      * {@link org.springframework.transaction.IllegalTransactionStateException}.
      *
@@ -100,8 +101,9 @@ public class ManageEmail {
      * Persists the email as {@link EmailState#PENDING} in the caller's transaction and sends it right after that
      * transaction commits. The caller never waits for the SMTP round-trip.
      * <p>
-     * Must be called from within an active transaction: the email row and the attachment payloads
-     * are written in the caller's transaction, so they commit and roll back together with the caller's own data.
+     * Must be called from within an active transaction: the email row is written in the caller's transaction, so
+     * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
+     * with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the transaction itself.
      * Calling this method without an active transaction fails with an
      * {@link org.springframework.transaction.IllegalTransactionStateException}.
      * <p>

@@ -1,77 +1,133 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
+import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import jakarta.mail.internet.MimeMessage;
 import org.jspecify.annotations.NullMarked;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContext;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-@SpringBootTest(properties = "aboutbits.emailservice.async-dispatch.enabled=false")
-@WithPostgres
 @NullMarked
 class SendAsyncEmailsTest {
-    @MockitoSpyBean
-    JavaMailSender javaMailSender;
-
-    @Autowired
-    ApplicationContext applicationContext;
-
-    @Autowired
-    ManageEmail manageEmail;
-
-    @Autowired
-    EmailRepository emailRepository;
-
-    @Autowired
-    SendScheduledEmails sendScheduledEmails;
-
-    @Autowired
-    PlatformTransactionManager transactionManager;
-
-    @BeforeEach
-    void setup() {
-        doNothing().when(javaMailSender).send(any(MimeMessage.class));
+    @Test
+    void givenNonPositiveThreads_constructor_shouldFail() {
+        assertThatIllegalArgumentException().isThrownBy(
+                () -> new SendAsyncEmails(mock(ManageEmail.class), 0, 100)
+        ).withMessageContaining("threads");
     }
 
     @Test
-    void givenAsyncDispatchDisabled_context_shouldNotCreateDispatcher() {
-        assertThat(applicationContext.getBeanNamesForType(SendAsyncEmails.class)).isEmpty();
+    void givenNonPositiveQueueCapacity_constructor_shouldFail() {
+        assertThatIllegalArgumentException().isThrownBy(
+                () -> new SendAsyncEmails(mock(ManageEmail.class), 1, 0)
+        ).withMessageContaining("queue-capacity");
     }
 
-    @Test
-    void givenAsyncDispatchDisabled_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
+    @Nested
+    @SpringBootTest(properties = {
+            "aboutbits.emailservice.async-dispatch.threads=1",
+            "aboutbits.emailservice.async-dispatch.queue-capacity=1"
+    })
+    @WithPostgres
+    class OnQueued {
+        @MockitoSpyBean
+        JavaMailSender javaMailSender;
+
+        @Autowired
+        ManageEmail manageEmail;
+
+        @Autowired
+        EmailRepository emailRepository;
+
+        @Autowired
+        SendScheduledEmails sendScheduledEmails;
+
+        @Autowired
+        PlatformTransactionManager transactionManager;
+
+        @Test
+        void givenFullQueue_sendAsync_shouldLeaveEmailToTheScheduler() throws Exception {
+            // Hold the SMTP call open, so the single worker stays busy and the queue of one fills up
+            var release = new CountDownLatch(1);
+            doAnswer(_ -> {
+                release.await(10, TimeUnit.SECONDS);
+                return null;
+            }).when(javaMailSender).send(any(MimeMessage.class));
+
+            EmailDto inFlight;
+            EmailDto queued;
+            EmailDto rejected;
+            try {
+                inFlight = sendAsyncInTransaction(manageEmail, transactionManager);
+                queued = sendAsyncInTransaction(manageEmail, transactionManager);
+                rejected = sendAsyncInTransaction(manageEmail, transactionManager);
+
+                await().atMost(Duration.ofSeconds(10)).untilAsserted(
+                        () -> assertThat(stateOf(emailRepository, inFlight)).isEqualTo(EmailState.SENDING)
+                );
+                assertThat(stateOf(emailRepository, queued)).isEqualTo(EmailState.PENDING);
+                assertThat(stateOf(emailRepository, rejected)).isEqualTo(EmailState.PENDING);
+            } finally {
+                release.countDown();
+            }
+
+            // The worker drains what it holds ...
+            await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+                assertThat(stateOf(emailRepository, inFlight)).isEqualTo(EmailState.SENT);
+                assertThat(stateOf(emailRepository, queued)).isEqualTo(EmailState.SENT);
+            });
+            // ... but the rejected hand-off is gone for good: nothing dispatches that email
+            assertThat(stateOf(emailRepository, rejected)).isEqualTo(EmailState.PENDING);
+            verify(javaMailSender, times(2)).send(any(MimeMessage.class));
+
+            // The scheduler sends it on its next pass
+            sendScheduledEmails.sendEmails();
+
+            assertThat(stateOf(emailRepository, rejected)).isEqualTo(EmailState.SENT);
+            verify(javaMailSender, times(3)).send(any(MimeMessage.class));
+        }
+    }
+
+    // sendAsync() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
+    private static EmailDto sendAsyncInTransaction(
+            ManageEmail manageEmail,
+            PlatformTransactionManager transactionManager
+    ) throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
-        var result = manageEmail.sendAsync(validEmail());
-        transactionManager.commit(transaction);
+        try {
+            var result = manageEmail.sendAsync(validEmail());
+            transactionManager.commit(transaction);
+            return result;
+        } catch (EmailException | RuntimeException e) {
+            transactionManager.rollback(transaction);
+            throw e;
+        }
+    }
 
-        // Nothing is dispatched after the commit
-        assertThat(emailRepository.findById(result.id()))
-                .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.PENDING));
-        verify(javaMailSender, never()).send(any(MimeMessage.class));
-
-        // The scheduler sends it on its next pass
-        sendScheduledEmails.sendEmails();
-
-        assertThat(emailRepository.findById(result.id()))
-                .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.SENT));
-        verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+    private static EmailState stateOf(EmailRepository emailRepository, EmailDto email) {
+        return emailRepository.findById(email.id()).orElseThrow().getState();
     }
 
     private static EmailParameter.Email validEmail() {

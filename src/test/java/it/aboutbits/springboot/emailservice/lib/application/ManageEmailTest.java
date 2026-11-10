@@ -66,6 +66,9 @@ class ManageEmailTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
+    @Autowired
+    private SendScheduledEmails sendScheduledEmails;
+
     @BeforeEach
     void setup() {
         doNothing().when(javaMailSender).send(any(MimeMessage.class));
@@ -284,6 +287,9 @@ class ManageEmailTest {
         assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
                 () -> manageEmail.schedule(parameter)
         );
+
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+        assertThat(emailRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -343,8 +349,10 @@ class ManageEmailTest {
         transactionManager.commit(transaction);
 
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                assertThat(emailRepository.findById(result.id()))
-                        .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.SENT))
+                                                                     assertThat(emailRepository.findById(result.id()))
+                                                                             .hasValueSatisfying(email -> assertThat(
+                                                                                     email.getState()).isEqualTo(
+                                                                                     EmailState.SENT))
         );
         verify(javaMailSender, times(1)).send(any(MimeMessage.class));
     }
@@ -356,7 +364,14 @@ class ManageEmailTest {
         transactionManager.rollback(transaction);
 
         assertThat(emailRepository.findById(result.id())).isEmpty();
-        verify(javaMailSender, never()).send(any(MimeMessage.class));
+        // The send would happen on another thread; make sure it does not merely happen later
+        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                                                                                                   verify(
+                                                                                                           javaMailSender,
+                                                                                                           never()
+                                                                                                   ).send(any(
+                                                                                                           MimeMessage.class))
+        );
     }
 
     @Test
@@ -367,12 +382,16 @@ class ManageEmailTest {
 
         // One failed attempt, then back to PENDING with a backoff, exactly like a failed scheduler attempt
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                assertThat(emailRepository.findById(result.id())).hasValueSatisfying(email -> {
-                    assertThat(email.getAttempts()).isEqualTo(1);
-                    assertThat(email.getState()).isEqualTo(EmailState.PENDING);
-                    assertThat(email.getScheduledAt()).isAfter(OffsetDateTime.now());
-                    assertThat(email.getErrorMessage()).isNotBlank();
-                })
+                                                                     assertThat(emailRepository.findById(result.id())).hasValueSatisfying(
+                                                                             email -> {
+                                                                                 assertThat(email.getAttempts()).isEqualTo(
+                                                                                         1);
+                                                                                 assertThat(email.getState()).isEqualTo(
+                                                                                         EmailState.PENDING);
+                                                                                 assertThat(email.getScheduledAt()).isAfter(
+                                                                                         OffsetDateTime.now());
+                                                                                 assertThat(email.getErrorMessage()).isNotBlank();
+                                                                             })
         );
         verify(javaMailSender, times(1)).send(any(MimeMessage.class));
     }
