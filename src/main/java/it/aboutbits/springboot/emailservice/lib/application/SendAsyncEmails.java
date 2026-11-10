@@ -1,5 +1,6 @@
 package it.aboutbits.springboot.emailservice.lib.application;
 
+import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.model.Email;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -79,7 +80,11 @@ public class SendAsyncEmails {
 
         try {
             var updated = manageEmail.completeClaimedSend(claimed.get());
-            log.debug(JOB_DESCRIPTION + " | Email {} finished in state {}.", id, updated.getState());
+            if (updated.getState() == EmailState.SENT) {
+                log.info(JOB_DESCRIPTION + " | Email {} sent.", id);
+            } else {
+                log.debug(JOB_DESCRIPTION + " | Email {} finished in state {}.", id, updated.getState());
+            }
         } catch (Exception e) {
             // Best-effort visibility only: we cannot reliably recover here. The email may already have been
             // sent but persisting the result failed, so the row stays in SENDING and will be re-claimed and
