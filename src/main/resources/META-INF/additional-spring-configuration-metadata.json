@@ -45,13 +45,13 @@
         {
             "name": "aboutbits.emailservice.async-dispatch.threads",
             "type": "java.lang.Integer",
-            "description": "Number of threads of the executor sending emails right after commit, i.e. how many SMTP sends run in parallel per pod. The default of one matches the scheduler, which sends sequentially.",
+            "description": "Number of threads of the executor sending emails right after commit, i.e. how many SMTP sends run in parallel per pod. The default of one matches the scheduler, which sends sequentially. Must be at least 1.",
             "defaultValue": 1
         },
         {
             "name": "aboutbits.emailservice.async-dispatch.queue-capacity",
             "type": "java.lang.Integer",
-            "description": "Maximum number of emails waiting for a thread of the after-commit executor. When the queue is full, the hand-off is dropped and the scheduler sends the email instead.",
+            "description": "Maximum number of emails waiting for a thread of the after-commit executor. When the queue is full, the hand-off is dropped and the scheduler sends the email instead. Must be at least 1.",
             "defaultValue": 100
         },
         {
