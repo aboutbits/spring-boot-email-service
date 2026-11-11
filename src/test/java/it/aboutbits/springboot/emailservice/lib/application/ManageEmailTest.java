@@ -29,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.UnexpectedRollbackException;
 
 import java.io.ByteArrayInputStream;
 import java.time.Duration;
@@ -349,11 +350,11 @@ class ManageEmailTest {
 
         transactionManager.commit(transaction);
 
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                                                                     assertThat(emailRepository.findById(result.id()))
-                                                                             .hasValueSatisfying(email -> assertThat(
-                                                                                     email.getState()).isEqualTo(
-                                                                                     EmailState.SENT))
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(
+                () -> assertThat(emailRepository.findById(result.id()))
+                        .hasValueSatisfying(email -> assertThat(
+                                email.getState()).isEqualTo(
+                                EmailState.SENT))
         );
         verify(javaMailSender, times(1)).send(any(MimeMessage.class));
     }
@@ -366,12 +367,12 @@ class ManageEmailTest {
 
         assertThat(emailRepository.findById(result.id())).isEmpty();
         // The send would happen on another thread; make sure it does not merely happen later
-        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).untilAsserted(() ->
-                                                                                                   verify(
-                                                                                                           javaMailSender,
-                                                                                                           never()
-                                                                                                   ).send(any(
-                                                                                                           MimeMessage.class))
+        await().during(Duration.ofMillis(300)).atMost(Duration.ofSeconds(2)).untilAsserted(
+                () -> verify(
+                        javaMailSender,
+                        never()
+                ).send(any(
+                        MimeMessage.class))
         );
     }
 
@@ -382,19 +383,54 @@ class ManageEmailTest {
         var result = sendAsyncInTransaction(getValidParameterWithoutAttachment().email());
 
         // One failed attempt, then back to PENDING with a backoff, exactly like a failed scheduler attempt
-        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                                                                     assertThat(emailRepository.findById(result.id())).hasValueSatisfying(
-                                                                             email -> {
-                                                                                 assertThat(email.getAttempts()).isEqualTo(
-                                                                                         1);
-                                                                                 assertThat(email.getState()).isEqualTo(
-                                                                                         EmailState.PENDING);
-                                                                                 assertThat(email.getScheduledAt()).isAfter(
-                                                                                         OffsetDateTime.now());
-                                                                                 assertThat(email.getErrorMessage()).isNotBlank();
-                                                                             })
-        );
+        await().atMost(Duration.ofSeconds(10))
+                .untilAsserted(() -> assertThat(emailRepository.findById(result.id())).hasValueSatisfying(
+                        email -> {
+                            assertThat(email.getAttempts()).isEqualTo(
+                                    1);
+                            assertThat(email.getState()).isEqualTo(
+                                    EmailState.PENDING);
+                            assertThat(email.getScheduledAt()).isAfter(
+                                    OffsetDateTime.now());
+                            assertThat(email.getErrorMessage()).isNotBlank();
+                        })
+                );
         verify(javaMailSender, times(1)).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenAttachmentError_sendAsync_shouldMarkTheCallersTransactionRollbackOnly() throws AttachmentException {
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException("store down"));
+        var email = getValidParameterWithAttachment().email();
+
+        // A caller that swallows the checked exception and carries on, as Spring's default rules would let it
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        assertThatExceptionOfType(EmailException.class).isThrownBy(
+                () -> manageEmail.sendAsync(email)
+        );
+
+        // ... must not be able to commit its own data without the email
+        assertThatExceptionOfType(UnexpectedRollbackException.class).isThrownBy(
+                () -> transactionManager.commit(transaction)
+        );
+        assertThat(emailRepository.findAll()).isEmpty();
+        verify(javaMailSender, never()).send(any(MimeMessage.class));
+    }
+
+    @Test
+    void givenAttachmentError_schedule_shouldMarkTheCallersTransactionRollbackOnly() throws AttachmentException {
+        when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException("store down"));
+        var parameter = getValidParameterWithAttachment();
+
+        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
+        assertThatExceptionOfType(EmailException.class).isThrownBy(
+                () -> manageEmail.schedule(parameter)
+        );
+
+        assertThatExceptionOfType(UnexpectedRollbackException.class).isThrownBy(
+                () -> transactionManager.commit(transaction)
+        );
+        assertThat(emailRepository.findAll()).isEmpty();
     }
 
     @Test

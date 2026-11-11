@@ -79,11 +79,12 @@ public class ManageEmail {
      * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
      * with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the transaction itself.
      * Calling this method without an active transaction fails with an
-     * {@link org.springframework.transaction.IllegalTransactionStateException}.
+     * {@link org.springframework.transaction.IllegalTransactionStateException}. An {@link EmailException} marks the
+     * caller's transaction rollback-only: the caller's data is never committed without the email.
      *
      * @return the stored email, in state {@link EmailState#PENDING}
      */
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = EmailException.class)
     public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
         Email email;
         try {
@@ -105,7 +106,8 @@ public class ManageEmail {
      * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
      * with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the transaction itself.
      * Calling this method without an active transaction fails with an
-     * {@link org.springframework.transaction.IllegalTransactionStateException}.
+     * {@link org.springframework.transaction.IllegalTransactionStateException}. An {@link EmailException} marks the
+     * caller's transaction rollback-only: the caller's data is never committed without the email.
      * <p>
      * After the commit, the email id is handed to a bounded executor that claims the row with the same kind of
      * atomic update as the scheduler, so it is never sent twice. If the hand-off is lost (saturated executor, pod
@@ -115,7 +117,7 @@ public class ManageEmail {
      *
      * @return the stored email, in state {@link EmailState#PENDING}
      */
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = EmailException.class)
     public EmailDto sendAsync(@Valid EmailParameter.Email email) throws EmailException {
         Email entity;
         try {
