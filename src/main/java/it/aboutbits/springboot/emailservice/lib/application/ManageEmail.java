@@ -19,10 +19,12 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.validation.annotation.Validated;
@@ -151,8 +153,13 @@ public class ManageEmail {
      *
      * @return the stored email, in state {@link EmailState#SENT}
      */
-    @Transactional(propagation = Propagation.NEVER)
     public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalTransactionStateException(
+                    "sendOrFail must not be called within an active transaction"
+            );
+        }
+
         Email email;
         try {
             email = fromParameter(parameter.scheduledAt(), parameter.email());
