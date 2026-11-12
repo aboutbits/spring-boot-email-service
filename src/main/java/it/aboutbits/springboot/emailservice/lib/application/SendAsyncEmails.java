@@ -28,8 +28,14 @@ public class SendAsyncEmails {
 
     private final ManageEmail manageEmail;
     private final ThreadPoolTaskExecutor executor;
+    private final int awaitTerminationSeconds;
 
     public SendAsyncEmails(ManageEmail manageEmail, int threads, int queueCapacity) {
+        this(manageEmail, threads, queueCapacity, AWAIT_TERMINATION_SECONDS);
+    }
+
+    // Visible for tests, which use a short grace period on shutdown.
+    SendAsyncEmails(ManageEmail manageEmail, int threads, int queueCapacity, int awaitTerminationSeconds) {
         if (threads < 1) {
             throw new IllegalArgumentException("async-dispatch.threads must be at least 1, got " + threads);
         }
@@ -37,6 +43,7 @@ public class SendAsyncEmails {
             throw new IllegalArgumentException("async-dispatch.queue-capacity must be at least 1, got " + queueCapacity);
         }
         this.manageEmail = manageEmail;
+        this.awaitTerminationSeconds = awaitTerminationSeconds;
 
         // Bounded on purpose: when saturated, the hand-off is rejected and the scheduler sends the email instead.
         this.executor = new ThreadPoolTaskExecutor();
@@ -60,7 +67,7 @@ public class SendAsyncEmails {
             };
         });
         this.executor.setWaitForTasksToCompleteOnShutdown(true);
-        this.executor.setAwaitTerminationSeconds(AWAIT_TERMINATION_SECONDS);
+        this.executor.setAwaitTerminationSeconds(awaitTerminationSeconds);
         this.executor.initialize();
     }
 
@@ -86,6 +93,7 @@ public class SendAsyncEmails {
     }
 
     private void send(long id) {
+        // First attempt only: if this task was delayed and the scheduler got there first, there is nothing to do.
         Optional<Email> claimed;
         try {
             claimed = manageEmail.tryClaimPendingForSend(id);
@@ -121,9 +129,21 @@ public class SendAsyncEmails {
         }
     }
 
-    // Lets in-flight and queued sends finish (bounded by AWAIT_TERMINATION_SECONDS).
-    // Anything left behind stays PENDING or SENDING in the database and is recovered by the scheduler.
+    // Lets in-flight and queued sends finish, bounded by the grace period. Queued sends that have not started by then
+    // are dropped on purpose: they stay PENDING and the scheduler sends them after the restart.
     public void shutdown() {
         executor.shutdown();
+
+        var pool = executor.getThreadPoolExecutor();
+        if (!pool.isTerminated()) {
+            var dropped = pool.shutdownNow();
+            log.warn(
+                    JOB_DESCRIPTION + " | {} queued send(s) not started within {}s were dropped and stay PENDING for "
+                            + "the scheduler. A send still in flight finishes if it can; otherwise its row stays "
+                            + "SENDING until the recovery threshold.",
+                    dropped.size(),
+                    awaitTerminationSeconds
+            );
+        }
     }
 }

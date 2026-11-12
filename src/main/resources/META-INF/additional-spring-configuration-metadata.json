@@ -39,7 +39,7 @@
         {
             "name": "aboutbits.emailservice.async-dispatch.enabled",
             "type": "java.lang.Boolean",
-            "description": "Sends emails queued via ManageEmail.sendAsync right after the caller's transaction committed, on a bounded executor. When disabled, such emails are sent by the scheduler only; recommended for tests. On shutdown the library waits up to 30 seconds for queued and in-flight sends; whatever is left is picked up by the scheduler.",
+            "description": "Sends emails queued via ManageEmail.sendAsync right after the caller's transaction committed, on a bounded executor. When disabled, such emails are sent by the scheduler only; recommended for tests. On shutdown the library waits up to 30 seconds for queued and in-flight sends. Queued sends that have not started by then are dropped and stay PENDING for the scheduler; a send still in flight finishes if it can, otherwise its row stays SENDING until the recovery threshold.",
             "defaultValue": true
         },
         {

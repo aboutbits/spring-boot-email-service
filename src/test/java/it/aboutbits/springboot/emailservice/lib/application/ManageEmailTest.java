@@ -6,6 +6,7 @@ import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.exception.AttachmentException;
 import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
+import it.aboutbits.springboot.emailservice.support.database.factory.EmailFactory;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import jakarta.mail.Part;
 import jakarta.mail.internet.MimeBodyPart;
@@ -431,6 +432,22 @@ class ManageEmailTest {
                 () -> transactionManager.commit(transaction)
         );
         assertThat(emailRepository.findAll()).isEmpty();
+    }
+
+    @Test
+    void givenAlreadyAttemptedEmail_tryClaimPendingForSend_shouldLeaveItToTheScheduler() {
+        var fresh = emailRepository.save(EmailFactory.once().build());
+        var retried = emailRepository.save(EmailFactory.once().attempts(1).build());
+
+        assertThat(manageEmail.tryClaimPendingForSend(fresh.getId()))
+                .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.SENDING));
+
+        // Retries are the scheduler's: a delayed dispatch must never perform, and possibly terminate, one
+        assertThat(manageEmail.tryClaimPendingForSend(retried.getId())).isEmpty();
+        assertThat(emailRepository.findById(retried.getId())).hasValueSatisfying(email -> {
+            assertThat(email.getState()).isEqualTo(EmailState.PENDING);
+            assertThat(email.getAttempts()).isEqualTo(1);
+        });
     }
 
     @Test

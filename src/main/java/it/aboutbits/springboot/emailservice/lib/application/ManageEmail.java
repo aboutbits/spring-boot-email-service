@@ -191,8 +191,9 @@ public class ManageEmail {
         return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
     }
 
-    // Like tryClaimForSend, but never takes over a stale SENDING row: the after-commit dispatch only claims the row
-    // it just inserted, and recovering rows abandoned by a crashed pod is the scheduler's job.
+    // Like tryClaimForSend, but only for a row that has not been attempted yet and never for a stale SENDING row:
+    // the after-commit dispatch performs the first attempt of the row it just inserted, nothing else.
+    // Retries and recovering rows abandoned by a crashed pod are the scheduler's job.
     @Transactional
     Optional<Email> tryClaimPendingForSend(long id) {
         var claimed = emailRepository.claimPendingForSend(id, OffsetDateTime.now());

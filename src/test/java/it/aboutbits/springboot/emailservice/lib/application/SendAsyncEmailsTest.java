@@ -17,6 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -24,10 +25,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @NullMarked
 class SendAsyncEmailsTest {
@@ -43,6 +47,35 @@ class SendAsyncEmailsTest {
         assertThatIllegalArgumentException().isThrownBy(
                 () -> new SendAsyncEmails(mock(ManageEmail.class), 1, 0)
         ).withMessageContaining("queue-capacity");
+    }
+
+    @Test
+    void givenSendsStillQueuedAfterTheGracePeriod_shutdown_shouldDropThemForTheScheduler() throws Exception {
+        // Hold the worker inside its first claim, so the second send stays queued past a one-second grace period
+        var release = new CountDownLatch(1);
+        var manageEmail = mock(ManageEmail.class);
+        when(manageEmail.tryClaimPendingForSend(anyLong())).thenAnswer(_ -> {
+            try {
+                release.await(10, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+            return Optional.empty();
+        });
+        var dispatcher = new SendAsyncEmails(manageEmail, 1, 10, 1);
+
+        try {
+            dispatcher.onQueued(new AsyncEmailQueued(1L));
+            dispatcher.onQueued(new AsyncEmailQueued(2L));
+
+            dispatcher.shutdown();
+        } finally {
+            release.countDown();
+        }
+
+        // The queued send was dropped before it could claim its row; the row stays PENDING for the scheduler
+        verify(manageEmail).tryClaimPendingForSend(1L);
+        verify(manageEmail, never()).tryClaimPendingForSend(2L);
     }
 
     @Nested

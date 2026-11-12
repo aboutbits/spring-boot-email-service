@@ -84,8 +84,10 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
             @Param("staleSendingBefore") OffsetDateTime staleSendingBefore
     );
 
-    // Same compare-and-set as claimForSend, restricted to a due PENDING row. Used by the after-commit dispatch,
-    // which only ever claims the row it just inserted and must not take part in stale-SENDING recovery.
+    // Same compare-and-set as claimForSend, restricted to a due PENDING row that has not been attempted yet. Used by
+    // the after-commit dispatch, which performs the first attempt only: retries and stale-SENDING recovery are the
+    // scheduler's job, so every retry (and every terminal ERROR after the first attempt) goes through the scheduler
+    // and reaches its callback, even when a dispatch task was delayed past a retry backoff.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update Email e
@@ -97,6 +99,7 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
                where e.id = :id
                    and e.scheduledAt <= :now
                    and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
+                   and e.attempts = 0
             """)
     int claimPendingForSend(
             @Param("id") long id,

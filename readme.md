@@ -145,10 +145,11 @@ To read email datasets from the database use this class: [QueryEmail.java](src%2
 
 If you want to receive a report after each run of the scheduler, create a Bean implementing [EmailSchedulerCallback.java](src%2Fmain%2Fjava%2Fit%2Faboutbits%2Fspringboot%2Femailservice%2Flib%2FEmailSchedulerCallback.java)
 
-The report covers that scheduler pass only. Emails sent right after commit by `sendAsync` are not included, and an
-email that fails on that first attempt shows up once a later scheduler pass finishes it. With the default
-`scheduling.max-attempts` every `ERROR` therefore still reaches the callback; with `scheduling.max-attempts=1` the
-`sendAsync` ones do not. Use `QueryEmail` for a complete picture.
+The report covers that scheduler pass only. Emails sent right after commit by `sendAsync` are not included. The
+after-commit dispatch performs the first attempt only, every retry runs through the scheduler, so an email that fails
+on that first attempt shows up once a scheduler pass finishes it. With the default `scheduling.max-attempts` every
+`ERROR` therefore reaches the callback; with `scheduling.max-attempts=1` the `sendAsync` ones do not. Use `QueryEmail`
+for a complete picture.
 
 ### Configuration
 
@@ -176,7 +177,7 @@ The following configuration options are available:
 | `aboutbits.emailservice.scheduling.interval`                            | 30000   | Milliseconds delay between runs of the scheduler.                                                                      |
 | `aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold`    | PT30M   | How long an email may stay in `SENDING` before being considered abandoned (crashed pod) and eligible to be re-claimed. Must comfortably exceed the worst-case SMTP send duration: JavaMail's default connect/read/write timeouts are infinite, so configure `spring.mail.properties.mail.smtp.connectiontimeout`, `spring.mail.properties.mail.smtp.timeout` and `spring.mail.properties.mail.smtp.writetimeout` well below this threshold, otherwise a slow in-flight send can be re-claimed by another pod and delivered twice. This applies to sends of the after-commit dispatch as well. |
 | `aboutbits.emailservice.scheduling.stuck-cleanup-recovery-threshold`    | PT30M   | How long an email may keep its attachment-cleanup lock before the cleanup is considered abandoned (crashed pod) and eligible to be re-claimed. Must comfortably exceed the worst-case duration of releasing all attachments of a single email, otherwise a slow in-flight cleanup can be re-claimed by another pod and its attachments released twice (harmless only if `AttachmentDataSource.releaseAttachment` is idempotent). |
-| `aboutbits.emailservice.async-dispatch.enabled`                         | true    | Sends emails queued via `sendAsync` right after the caller's transaction committed, on a bounded executor. When disabled, such emails are sent by the scheduler only (recommended for tests). On shutdown the library waits up to 30 seconds for queued and in-flight sends; whatever is left stays `PENDING` or `SENDING` and is picked up by the scheduler. |
+| `aboutbits.emailservice.async-dispatch.enabled`                         | true    | Sends emails queued via `sendAsync` right after the caller's transaction committed, on a bounded executor. When disabled, such emails are sent by the scheduler only (recommended for tests). On shutdown the library waits up to 30 seconds for queued and in-flight sends. Queued sends that have not started by then are dropped and stay `PENDING` for the scheduler; a send still in flight finishes if it can, otherwise its row stays `SENDING` until the recovery threshold. |
 | `aboutbits.emailservice.async-dispatch.threads`                         | 1       | Number of threads of the after-commit executor, i.e. how many SMTP sends run in parallel per pod. The default of one matches the scheduler, which sends sequentially. Must be at least 1. |
 | `aboutbits.emailservice.async-dispatch.queue-capacity`                  | 100     | Maximum number of emails waiting for a thread of the after-commit executor. When the queue is full, the hand-off is dropped and the scheduler sends the email instead. Must be at least 1. |
 | `aboutbits.emailservice.scheduling.max-attempts`                        | 3       | Maximum number of send attempts before an email is marked as `ERROR`. Applies to `sendAsync` and `schedule`; the attempt right after commit counts as the first one. `sendOrFail` makes exactly one attempt and is never retried. Failed attempts are retried with exponential backoff (`scheduling.interval` × 2^attempts); with the defaults a persistently failing email runs attempt 1 → +60s → attempt 2 → +120s → attempt 3 → `ERROR`. |
