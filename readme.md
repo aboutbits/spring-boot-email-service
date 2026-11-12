@@ -66,7 +66,7 @@ to the caller's transaction:
 |-------------------------|--------------------------------------------------------------------------------------------------|-----------------------|------------------------|
 | `sendAsync(email)`      | Right after the caller's transaction commits, as soon as a dispatcher thread is free; retried by the scheduler | No                    | Required (`MANDATORY`) |
 | `schedule(parameter)`   | At `scheduledAt`, by the scheduler; retried                                                      | No                    | Required (`MANDATORY`) |
-| `sendOrFail(parameter)` | Immediately, one attempt, `EmailException` to the caller                                         | Yes                   | Not allowed (`NEVER`)  |
+| `sendOrFail(parameter)` | Immediately, one attempt, `EmailException` to the caller                                         | Yes                   | Not allowed (fails inside one) |
 
 **Pattern:** call `sendAsync` (or `schedule` for a later point in time) inside the `@Transactional` method that writes
 the data the email is about (outbox pattern). The email row is written in the caller's transaction, so it commits and
