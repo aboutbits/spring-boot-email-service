@@ -31,13 +31,13 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest(properties = {
         "aboutbits.emailservice.scheduling.max-attempts=3",
         "aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold=PT5M",
-        "aboutbits.emailservice.scheduling.interval=30000"
+        "aboutbits.emailservice.scheduling.interval=3600000"
 })
 @WithPostgres
 @NullMarked
 class SendScheduledEmailsTest {
     private static final int MAX_ATTEMPTS = 3;
-    private static final int SCHEDULER_INTERVAL_SECONDS = 30;
+    private static final int SCHEDULER_INTERVAL_SECONDS = 3600;
 
     @MockitoSpyBean
     JavaMailSender javaMailSender;
