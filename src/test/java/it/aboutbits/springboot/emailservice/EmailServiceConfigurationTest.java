@@ -62,7 +62,7 @@ class EmailServiceConfigurationTest {
     private EmailDto scheduleInTransaction(EmailParameter parameter) throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
-            var result = manageEmail.schedule(parameter);
+            var result = manageEmail.schedule(parameter, OffsetDateTime.now());
             transactionManager.commit(transaction);
             return result;
         } catch (EmailException | RuntimeException e) {
@@ -73,36 +73,30 @@ class EmailServiceConfigurationTest {
 
     private static EmailParameter getValidParameterWithoutAttachment() {
         return EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1>")
-                               .recipient("person1@example.com")
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
+                .subject("Example email subject")
+                .textBody("Email body")
+                .htmlBody("<h1>Html email body</h1>")
+                .recipient("person1@example.com")
+                .fromAddress("somebody@aboutbits.it")
+                .fromName("somebody")
+                .build();
     }
 
     private static EmailParameter getValidParameterWithAttachment() {
         return EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1>")
-                               .recipient("person1@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("x.png")
-                                               .payload(new ByteArrayInputStream(new byte[0]))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .build()
-                ).build();
+                .subject("Example email subject")
+                .textBody("Email body")
+                .htmlBody("<h1>Html email body</h1>")
+                .recipient("person1@example.com")
+                .attachment(
+                        EmailParameter.Attachment.builder()
+                                .contentType("image/png")
+                                .fileName("x.png")
+                                .payload(new ByteArrayInputStream(new byte[0]))
+                                .build()
+                )
+                .fromAddress("somebody@aboutbits.it")
+                .fromName("somebody")
+                .build();
     }
 }

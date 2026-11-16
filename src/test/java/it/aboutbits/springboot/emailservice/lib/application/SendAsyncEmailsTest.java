@@ -163,8 +163,8 @@ class SendAsyncEmailsTest {
         return emailRepository.findById(email.id()).orElseThrow().getState();
     }
 
-    private static EmailParameter.Email validEmail() {
-        return EmailParameter.Email.builder()
+    private static EmailParameter validEmail() {
+        return EmailParameter.builder()
                 .subject("Example email subject")
                 .textBody("Email body")
                 .htmlBody("<h1>Html email body</h1>")

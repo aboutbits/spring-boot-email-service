@@ -81,20 +81,22 @@ class ManageEmailTest {
     void givenRequiredParameters_schedule_shouldCreateNewNotification() throws EmailException {
         var parameter = getValidParameterWithoutAttachment();
 
-        var result = scheduleInTransaction(parameter);
+        var scheduledAt = OffsetDateTime.now().plusDays(1);
+
+        var result = scheduleInTransaction(parameter, scheduledAt);
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
-        assertThat(result.subject()).isEqualTo(parameter.email().subject());
-        assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
-        assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
-        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
-        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
-        assertThat(result.recipients()).containsAll(parameter.email().recipients());
-        assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
-        assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
+        assertThat(result.subject()).isEqualTo(parameter.subject());
+        assertThat(result.fromAddress()).isEqualTo(parameter.fromAddress());
+        assertThat(result.fromName()).isEqualTo(parameter.fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.replyToName());
+        assertThat(result.recipients()).containsAll(parameter.recipients());
+        assertThat(result.textBody()).isEqualTo(parameter.textBody());
+        assertThat(result.htmlBody()).isEqualTo(parameter.htmlBody());
         assertThat(result.attachments()).isEmpty();
-        assertThat(result.scheduledAt()).isEqualTo(parameter.scheduledAt());
+        assertThat(result.scheduledAt()).isEqualTo(scheduledAt);
     }
 
     @Test
@@ -103,20 +105,22 @@ class ManageEmailTest {
 
         var parameter = getValidParameterWithAttachment();
 
-        var result = scheduleInTransaction(parameter);
+        var scheduledAt = OffsetDateTime.now().plusDays(1);
+
+        var result = scheduleInTransaction(parameter, scheduledAt);
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
-        assertThat(result.subject()).isEqualTo(parameter.email().subject());
-        assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
-        assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
-        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
-        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
-        assertThat(result.recipients()).containsAll(parameter.email().recipients());
-        assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
-        assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
+        assertThat(result.subject()).isEqualTo(parameter.subject());
+        assertThat(result.fromAddress()).isEqualTo(parameter.fromAddress());
+        assertThat(result.fromName()).isEqualTo(parameter.fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.replyToName());
+        assertThat(result.recipients()).containsAll(parameter.recipients());
+        assertThat(result.textBody()).isEqualTo(parameter.textBody());
+        assertThat(result.htmlBody()).isEqualTo(parameter.htmlBody());
         assertThat(result.attachments()).hasSize(1);
-        assertThat(result.scheduledAt()).isEqualTo(parameter.scheduledAt());
+        assertThat(result.scheduledAt()).isEqualTo(scheduledAt);
     }
 
     @Test
@@ -127,16 +131,16 @@ class ManageEmailTest {
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.SENT);
-        assertThat(result.subject()).isEqualTo(parameter.email().subject());
-        assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
-        assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
-        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
-        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
-        assertThat(result.recipients()).containsAll(parameter.email().recipients());
-        assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
-        assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
+        assertThat(result.subject()).isEqualTo(parameter.subject());
+        assertThat(result.fromAddress()).isEqualTo(parameter.fromAddress());
+        assertThat(result.fromName()).isEqualTo(parameter.fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.replyToName());
+        assertThat(result.recipients()).containsAll(parameter.recipients());
+        assertThat(result.textBody()).isEqualTo(parameter.textBody());
+        assertThat(result.htmlBody()).isEqualTo(parameter.htmlBody());
         assertThat(result.attachments()).isEmpty();
-        assertThat(result.scheduledAt()).isEqualTo(parameter.scheduledAt());
+        assertThat(result.scheduledAt()).isBeforeOrEqualTo(OffsetDateTime.now());
     }
 
     @Test
@@ -150,16 +154,16 @@ class ManageEmailTest {
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.SENT);
-        assertThat(result.subject()).isEqualTo(parameter.email().subject());
-        assertThat(result.fromAddress()).isEqualTo(parameter.email().fromAddress());
-        assertThat(result.fromName()).isEqualTo(parameter.email().fromName());
-        assertThat(result.replyToAddress()).isEqualTo(parameter.email().replyToAddress());
-        assertThat(result.replyToName()).isEqualTo(parameter.email().replyToName());
-        assertThat(result.recipients()).containsAll(parameter.email().recipients());
-        assertThat(result.textBody()).isEqualTo(parameter.email().textBody());
-        assertThat(result.htmlBody()).isEqualTo(parameter.email().htmlBody());
+        assertThat(result.subject()).isEqualTo(parameter.subject());
+        assertThat(result.fromAddress()).isEqualTo(parameter.fromAddress());
+        assertThat(result.fromName()).isEqualTo(parameter.fromName());
+        assertThat(result.replyToAddress()).isEqualTo(parameter.replyToAddress());
+        assertThat(result.replyToName()).isEqualTo(parameter.replyToName());
+        assertThat(result.recipients()).containsAll(parameter.recipients());
+        assertThat(result.textBody()).isEqualTo(parameter.textBody());
+        assertThat(result.htmlBody()).isEqualTo(parameter.htmlBody());
         assertThat(result.attachments()).hasSize(1);
-        assertThat(result.scheduledAt()).isEqualTo(parameter.scheduledAt());
+        assertThat(result.scheduledAt()).isBeforeOrEqualTo(OffsetDateTime.now());
     }
 
     @Test
@@ -288,7 +292,7 @@ class ManageEmailTest {
         var parameter = getValidParameterWithoutAttachment();
 
         assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
-                () -> manageEmail.schedule(parameter)
+                () -> manageEmail.schedule(parameter, OffsetDateTime.now())
         );
 
         verify(javaMailSender, never()).send(any(MimeMessage.class));
@@ -305,7 +309,7 @@ class ManageEmailTest {
     @Test
     void givenRollingBackTransaction_schedule_shouldNotPersistEmail() throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
-        var result = manageEmail.schedule(getValidParameterWithoutAttachment());
+        var result = manageEmail.schedule(getValidParameterWithoutAttachment(), OffsetDateTime.now());
         transactionManager.rollback(transaction);
 
         assertThat(emailRepository.findById(result.id())).isEmpty();
@@ -330,7 +334,7 @@ class ManageEmailTest {
 
     @Test
     void givenNoActiveTransaction_sendAsync_shouldFail() {
-        var email = getValidParameterWithoutAttachment().email();
+        var email = getValidParameterWithoutAttachment();
 
         assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
                 () -> manageEmail.sendAsync(email)
@@ -343,7 +347,7 @@ class ManageEmailTest {
     @Test
     void givenCommittingTransaction_sendAsync_shouldSendRightAfterCommit() throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
-        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment().email());
+        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment());
 
         // Nothing leaves before the commit: the email is handed over only once the caller's data is committed
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
@@ -363,7 +367,7 @@ class ManageEmailTest {
     @Test
     void givenRollingBackTransaction_sendAsync_shouldNeitherPersistNorSend() throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
-        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment().email());
+        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment());
         transactionManager.rollback(transaction);
 
         assertThat(emailRepository.findById(result.id())).isEmpty();
@@ -381,7 +385,7 @@ class ManageEmailTest {
     void givenMailSenderError_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
         doThrow(new MailSendException("any")).when(javaMailSender).send(any(MimeMessage.class));
 
-        var result = sendAsyncInTransaction(getValidParameterWithoutAttachment().email());
+        var result = sendAsyncInTransaction(getValidParameterWithoutAttachment());
 
         // One failed attempt, then back to PENDING with a backoff, exactly like a failed scheduler attempt
         await().atMost(Duration.ofSeconds(10))
@@ -402,7 +406,7 @@ class ManageEmailTest {
     @Test
     void givenAttachmentError_sendAsync_shouldMarkTheCallersTransactionRollbackOnly() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException("store down"));
-        var email = getValidParameterWithAttachment().email();
+        var email = getValidParameterWithAttachment();
 
         // A caller that swallows the checked exception and carries on, as Spring's default rules would let it
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
@@ -425,7 +429,7 @@ class ManageEmailTest {
 
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         assertThatExceptionOfType(EmailException.class).isThrownBy(
-                () -> manageEmail.schedule(parameter)
+                () -> manageEmail.schedule(parameter, OffsetDateTime.now())
         );
 
         assertThatExceptionOfType(UnexpectedRollbackException.class).isThrownBy(
@@ -481,7 +485,7 @@ class ManageEmailTest {
     class SendAsync {
         @Test
         void givenAsyncDispatchDisabled_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
-            var result = sendAsyncInTransaction(getValidParameterWithoutAttachment().email());
+            var result = sendAsyncInTransaction(getValidParameterWithoutAttachment());
 
             // Nothing is dispatched after the commit
             assertThat(emailRepository.findById(result.id()))
@@ -499,9 +503,13 @@ class ManageEmailTest {
 
     // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
     private EmailDto scheduleInTransaction(EmailParameter parameter) throws EmailException {
+        return scheduleInTransaction(parameter, OffsetDateTime.now());
+    }
+
+    private EmailDto scheduleInTransaction(EmailParameter parameter, OffsetDateTime scheduledAt) throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
-            var result = manageEmail.schedule(parameter);
+            var result = manageEmail.schedule(parameter, scheduledAt);
             transactionManager.commit(transaction);
             return result;
         } catch (EmailException | RuntimeException e) {
@@ -511,7 +519,7 @@ class ManageEmailTest {
     }
 
     // sendAsync() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
-    private EmailDto sendAsyncInTransaction(EmailParameter.Email email) throws EmailException {
+    private EmailDto sendAsyncInTransaction(EmailParameter email) throws EmailException {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
             var result = manageEmail.sendAsync(email);
@@ -525,50 +533,44 @@ class ManageEmailTest {
 
     private static EmailParameter getValidParameterWithoutAttachment() {
         return EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1>")
-                               .recipient("person1@example.com")
-                               .recipient("person2@example.com")
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .replyToAddress("somebodyElse@aboutbits.it")
-                               .replyToName("somebodyElse")
-                               .build()
-                ).build();
+                .subject("Example email subject")
+                .textBody("Email body")
+                .htmlBody("<h1>Html email body</h1>")
+                .recipient("person1@example.com")
+                .recipient("person2@example.com")
+                .fromAddress("somebody@aboutbits.it")
+                .fromName("somebody")
+                .replyToAddress("somebodyElse@aboutbits.it")
+                .replyToName("somebodyElse")
+                .build();
     }
 
     private static EmailParameter getValidParameterWithAttachment() {
         return EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(EmailParameter.Email.builder()
-                               .subject("Example email subject")
-                               .textBody("Email body")
-                               .htmlBody("<h1>Html email body</h1>")
-                               .recipient("person1@example.com")
-                               .recipient("person2@example.com")
-                               .attachment(
-                                       EmailParameter.Email.Attachment.builder()
-                                               .contentType("image/png")
-                                               .fileName("x.png")
-                                               .payload(new ByteArrayInputStream(new byte[0]))
-                                               .build()
-                               )
-                               .fromAddress("somebody@aboutbits.it")
-                               .fromName("somebody")
-                               .replyToAddress("somebodyElse@aboutbits.it")
-                               .replyToName("somebodyElse")
-                               .build()
-                ).build();
+                .subject("Example email subject")
+                .textBody("Email body")
+                .htmlBody("<h1>Html email body</h1>")
+                .recipient("person1@example.com")
+                .recipient("person2@example.com")
+                .attachment(
+                        EmailParameter.Attachment.builder()
+                                .contentType("image/png")
+                                .fileName("x.png")
+                                .payload(new ByteArrayInputStream(new byte[0]))
+                                .build()
+                )
+                .fromAddress("somebody@aboutbits.it")
+                .fromName("somebody")
+                .replyToAddress("somebodyElse@aboutbits.it")
+                .replyToName("somebodyElse")
+                .build();
     }
 
     private static EmailParameter getValidParameterWithInlineAttachment(
             @Nullable String htmlBody,
-            EmailParameter.Email.Attachment... attachments
+            EmailParameter.Attachment... attachments
     ) {
-        var emailBuilder = EmailParameter.Email.builder()
+        var emailBuilder = EmailParameter.builder()
                 .subject("Example email subject")
                 .textBody("Email body")
                 .recipient("person1@example.com")
@@ -582,18 +584,15 @@ class ManageEmailTest {
             emailBuilder.attachment(attachment);
         }
 
-        return EmailParameter.builder()
-                .scheduledAt(OffsetDateTime.now())
-                .email(emailBuilder.build())
-                .build();
+        return emailBuilder.build();
     }
 
-    private static EmailParameter.Email.Attachment inlineAttachment(String contentId) {
+    private static EmailParameter.Attachment inlineAttachment(String contentId) {
         return inlineAttachment(contentId, "logo.png");
     }
 
-    private static EmailParameter.Email.Attachment inlineAttachment(String contentId, String fileName) {
-        return EmailParameter.Email.Attachment.builder()
+    private static EmailParameter.Attachment inlineAttachment(String contentId, String fileName) {
+        return EmailParameter.Attachment.builder()
                 .contentType("image/png")
                 .fileName(fileName)
                 .contentId(contentId)
@@ -601,8 +600,8 @@ class ManageEmailTest {
                 .build();
     }
 
-    private static EmailParameter.Email.Attachment regularAttachment(String fileName) {
-        return EmailParameter.Email.Attachment.builder()
+    private static EmailParameter.Attachment regularAttachment(String fileName) {
+        return EmailParameter.Attachment.builder()
                 .contentType("image/png")
                 .fileName(fileName)
                 .payload(new ByteArrayInputStream(new byte[]{1, 2, 3}))

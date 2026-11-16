@@ -39,10 +39,10 @@ This is the equivalent of `MimeMessageHelper.addInline(...)` and renders in all 
 
 ```java
 // @formatter:off
-EmailParameter.Email.builder()
+EmailParameter.builder()
         // ...
         .htmlBody("<img src=\"cid:header-logo\"><h1>Hello!</h1>")
-        .attachment(EmailParameter.Email.Attachment.builder()
+        .attachment(EmailParameter.Attachment.builder()
                 .contentId("header-logo")
                 .fileName("logo.png")
                 .contentType("image/png")
@@ -62,11 +62,11 @@ in the `htmlBody` as `cid:contentId`, otherwise validation fails.
 `ManageEmail` offers three ways to send an email. They differ in when the email goes out and in how the call relates
 to the caller's transaction:
 
-| Method                  | When the email goes out                                                                          | Caller waits for SMTP | Transaction            |
-|-------------------------|--------------------------------------------------------------------------------------------------|-----------------------|------------------------|
-| `sendAsync(email)`      | Right after the caller's transaction commits, as soon as a dispatcher thread is free; retried by the scheduler | No                    | Required (`MANDATORY`) |
-| `schedule(parameter)`   | At `scheduledAt`, by the scheduler; retried                                                      | No                    | Required (`MANDATORY`) |
-| `sendOrFail(parameter)` | Immediately, one attempt, `EmailException` to the caller                                         | Yes                   | Not allowed (fails inside one) |
+| Method                         | When the email goes out                                                                          | Caller waits for SMTP | Transaction            |
+|--------------------------------|--------------------------------------------------------------------------------------------------|-----------------------|------------------------|
+| `sendAsync(email)`             | Right after the caller's transaction commits, as soon as a dispatcher thread is free; retried by the scheduler | No                    | Required (`MANDATORY`) |
+| `schedule(email, scheduledAt)` | At `scheduledAt`, by the scheduler; retried                                                      | No                    | Required (`MANDATORY`) |
+| `sendOrFail(email)`            | Immediately, one attempt, `EmailException` to the caller                                         | Yes                   | Not allowed (fails inside one) |
 
 **Pattern:** call `sendAsync` (or `schedule` for a later point in time) inside the `@Transactional` method that writes
 the data the email is about (outbox pattern). The email row is written in the caller's transaction, so it commits and
@@ -101,7 +101,7 @@ public void inviteUser(final String to, final String subject, final String htmlB
     // ... write the data the email is about, in the same transaction ...
 
     manageEmail.sendAsync(
-            EmailParameter.Email.builder()
+            EmailParameter.builder()
                     .fromName(fromName)
                     .fromAddress(fromAddress)
                     .recipient(to)
@@ -114,7 +114,7 @@ public void inviteUser(final String to, final String subject, final String htmlB
 // @formatter:on
 ```
 
-To send at a later point in time, use `schedule` with an `EmailParameter` carrying the `scheduledAt`:
+To send at a later point in time, use `schedule` and pass the `scheduledAt` next to the `EmailParameter`:
 
 ```java
 // @formatter:off
@@ -122,16 +122,14 @@ To send at a later point in time, use `schedule` with an `EmailParameter` carryi
 public void remindLater(final String to, final String subject, final String htmlBody, final String plainTextBody) {
     manageEmail.schedule(
             EmailParameter.builder()
-                    .scheduledAt(OffsetDateTime.now().plusDays(1))
-                    .email(EmailParameter.Email.builder()
-                            .fromName(fromName)
-                            .fromAddress(fromAddress)
-                            .recipient(to)
-                            .subject(subject)
-                            .textBody(plainTextBody)
-                            .htmlBody(htmlBody)
-                            .build())
-                    .build()
+                    .fromName(fromName)
+                    .fromAddress(fromAddress)
+                    .recipient(to)
+                    .subject(subject)
+                    .textBody(plainTextBody)
+                    .htmlBody(htmlBody)
+                    .build(),
+            OffsetDateTime.now().plusDays(1)
     );
 }
 // @formatter:on

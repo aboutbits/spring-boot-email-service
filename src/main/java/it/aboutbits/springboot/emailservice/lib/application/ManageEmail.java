@@ -12,6 +12,7 @@ import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
 import it.aboutbits.springboot.emailservice.lib.model.EmailContent;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -75,7 +76,7 @@ public class ManageEmail {
     }
 
     /**
-     * Persists the email as {@link EmailState#PENDING} to be sent by the scheduler at {@code parameter.scheduledAt()}.
+     * Persists the email as {@link EmailState#PENDING} to be sent by the scheduler at {@code scheduledAt}.
      * <p>
      * Must be called from within an active transaction: the email row is written in the caller's transaction, so
      * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
@@ -87,15 +88,15 @@ public class ManageEmail {
      * @return the stored email, in state {@link EmailState#PENDING}
      */
     @Transactional(propagation = Propagation.MANDATORY, rollbackFor = EmailException.class)
-    public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
-        Email email;
+    public EmailDto schedule(@Valid EmailParameter email, @NotNull OffsetDateTime scheduledAt) throws EmailException {
+        Email entity;
         try {
-            email = fromParameter(parameter.scheduledAt(), parameter.email());
+            entity = fromParameter(scheduledAt, email);
         } catch (AttachmentException e) {
             throw new EmailException(e);
         }
 
-        var savedEmail = emailRepository.save(email);
+        var savedEmail = emailRepository.save(entity);
 
         return emailMapper.toDto(savedEmail);
     }
@@ -120,7 +121,7 @@ public class ManageEmail {
      * @return the stored email, in state {@link EmailState#PENDING}
      */
     @Transactional(propagation = Propagation.MANDATORY, rollbackFor = EmailException.class)
-    public EmailDto sendAsync(@Valid EmailParameter.Email email) throws EmailException {
+    public EmailDto sendAsync(@Valid EmailParameter email) throws EmailException {
         Email entity;
         try {
             entity = fromParameter(OffsetDateTime.now(), email);
@@ -148,40 +149,40 @@ public class ManageEmail {
      * <p>
      * Use this only when the email is not tied to a database write,
      * i.e. when the email and the caller's data need not stay consistent with each other.
-     * Otherwise, use {@link #sendAsync(EmailParameter.Email)} or {@link #schedule(EmailParameter)} inside the
-     * transaction that writes the data.
+     * Otherwise, use {@link #sendAsync(EmailParameter)} or {@link #schedule(EmailParameter, OffsetDateTime)}
+     * inside the transaction that writes the data.
      *
      * @return the stored email, in state {@link EmailState#SENT}
      */
-    public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
+    public EmailDto sendOrFail(@Valid EmailParameter email) throws EmailException {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalTransactionStateException(
                     "sendOrFail must not be called within an active transaction"
             );
         }
 
-        Email email;
+        Email entity;
         try {
-            email = fromParameter(parameter.scheduledAt(), parameter.email());
+            entity = fromParameter(OffsetDateTime.now(), email);
         } catch (AttachmentException e) {
             throw new EmailException(e);
         }
 
-        email.setExecutionStartTime(OffsetDateTime.now());
-        email.incrementAttempts();
+        entity.setExecutionStartTime(OffsetDateTime.now());
+        entity.incrementAttempts();
 
         try {
-            sendMail(email);
-            email.setState(EmailState.SENT);
-            email.setExecutionEndTime(OffsetDateTime.now());
+            sendMail(entity);
+            entity.setState(EmailState.SENT);
+            entity.setExecutionEndTime(OffsetDateTime.now());
         } catch (MessagingException | AttachmentException | IOException | RuntimeException e) {
-            log.error("Failed to send email: {}", email.getId(), e);
-            email.setState(EmailState.ERROR);
-            email.setExecutionEndTime(OffsetDateTime.now());
-            email.setErrorMessage(e.getMessage());
+            log.error("Failed to send email: {}", entity.getId(), e);
+            entity.setState(EmailState.ERROR);
+            entity.setExecutionEndTime(OffsetDateTime.now());
+            entity.setErrorMessage(e.getMessage());
         }
 
-        var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(email));
+        var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(entity));
 
         if (savedEmail.getState() == EmailState.ERROR) {
             throw new EmailException("Failed to send email [id=%s, providerMessage=%s]"
@@ -315,7 +316,7 @@ public class ManageEmail {
         mailSender.send(message);
     }
 
-    private Email fromParameter(OffsetDateTime scheduledAt, EmailParameter.Email emailData) throws AttachmentException {
+    private Email fromParameter(OffsetDateTime scheduledAt, EmailParameter emailData) throws AttachmentException {
         var email = new Email();
         email.setState(EmailState.PENDING);
         email.setScheduledAt(scheduledAt);
