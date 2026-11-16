@@ -62,21 +62,24 @@ in the `htmlBody` as `cid:contentId`, otherwise validation fails.
 `ManageEmail` offers three ways to send an email. They differ in when the email goes out and in how the call relates
 to the caller's transaction:
 
-| Method                         | When the email goes out                                                                          | Caller waits for SMTP | Transaction            |
-|--------------------------------|--------------------------------------------------------------------------------------------------|-----------------------|------------------------|
-| `sendAsync(email)`             | Right after the caller's transaction commits, as soon as a dispatcher thread is free; retried by the scheduler | No                    | Required (`MANDATORY`) |
-| `schedule(email, scheduledAt)` | At `scheduledAt`, by the scheduler; retried                                                      | No                    | Required (`MANDATORY`) |
-| `sendOrFail(email)`            | Immediately, one attempt, `EmailException` to the caller                                         | Yes                   | Not allowed (fails inside one) |
+| Method                         | When the email goes out                                                                          | Caller waits for SMTP | Transaction                                        |
+|--------------------------------|--------------------------------------------------------------------------------------------------|-----------------------|----------------------------------------------------|
+| `sendAsync(email)`             | Right after the caller's transaction commits, as soon as a dispatcher thread is free; retried by the scheduler | No                    | Joins the caller's; opens its own if there is none |
+| `schedule(email, scheduledAt)` | At `scheduledAt`, by the scheduler; retried                                                      | No                    | Joins the caller's; opens its own if there is none |
+| `sendOrFail(email)`            | Immediately, one attempt, `EmailException` to the caller                                         | Yes                   | Not allowed (fails inside one)                     |
 
 **Pattern:** call `sendAsync` (or `schedule` for a later point in time) inside the `@Transactional` method that writes
 the data the email is about (outbox pattern). The email row is written in the caller's transaction, so it commits and
-rolls back together with that data, and nothing goes out for a rolled-back transaction. Calling either method without
-an active transaction throws an `IllegalTransactionStateException`.
+rolls back together with that data, and nothing goes out for a rolled-back transaction.
 
-Use `sendOrFail` only outside any transaction, and only when the email is not tied to a database write (e.g. a "send test email" button).
+Without an active transaction both methods persist the email in a transaction of their own. Use that only for an email
+that is not tied to a database write. The library does not detect a forgotten `@Transactional`.
+
+Use `sendOrFail` only outside any transaction, when the email is not tied to a database write and the caller must know
+at once whether it went out (e.g. a "send test email" button).
 Inside a transaction the SMTP round-trip would run while the caller's database connection is held
 and a second connection would be needed to persist the outcome.
-Hence, calling it within an active transaction throws an `IllegalTransactionStateException` as well.
+Hence, calling it within an active transaction throws an `IllegalTransactionStateException`.
 
 Emails that still fail after `scheduling.max-attempts` attempts end up in state `ERROR` and are not retried anymore.
 Monitor these rows via `QueryEmail`. The reporting callback described below covers scheduler passes only: emails sent

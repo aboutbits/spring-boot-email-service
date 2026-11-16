@@ -288,15 +288,12 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenNoActiveTransaction_schedule_shouldFail() {
-        var parameter = getValidParameterWithoutAttachment();
+    void givenNoActiveTransaction_schedule_shouldPersistEmail() {
+        var result = manageEmail.schedule(getValidParameterWithoutAttachment(), OffsetDateTime.now());
 
-        assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
-                () -> manageEmail.schedule(parameter, OffsetDateTime.now())
-        );
-
+        // schedule() ran in a transaction of its own, which is committed by now
+        assertThat(emailRepository.findById(result.id())).isPresent();
         verify(javaMailSender, never()).send(any(MimeMessage.class));
-        assertThat(emailRepository.findAll()).isEmpty();
     }
 
     @Test
@@ -333,15 +330,15 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenNoActiveTransaction_sendAsync_shouldFail() {
-        var email = getValidParameterWithoutAttachment();
+    void givenNoActiveTransaction_sendAsync_shouldPersistAndSendEmail() {
+        var result = manageEmail.sendAsync(getValidParameterWithoutAttachment());
 
-        assertThatExceptionOfType(IllegalTransactionStateException.class).isThrownBy(
-                () -> manageEmail.sendAsync(email)
+        // sendAsync() ran in a transaction of its own, which is committed by now: the email is dispatched at once
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(
+                () -> assertThat(emailRepository.findById(result.id()))
+                        .hasValueSatisfying(email -> assertThat(email.getState()).isEqualTo(EmailState.SENT))
         );
-
-        verify(javaMailSender, never()).send(any(MimeMessage.class));
-        assertThat(emailRepository.findAll()).isEmpty();
+        verify(javaMailSender, times(1)).send(any(MimeMessage.class));
     }
 
     @Test
@@ -501,7 +498,7 @@ class ManageEmailTest {
         }
     }
 
-    // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
+    // Runs schedule() inside a caller's transaction and commits it, as an application following the pattern would.
     private EmailDto scheduleInTransaction(EmailParameter parameter) {
         return scheduleInTransaction(parameter, OffsetDateTime.now());
     }
@@ -518,7 +515,7 @@ class ManageEmailTest {
         }
     }
 
-    // sendAsync() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
+    // Runs sendAsync() inside a caller's transaction and commits it, as an application following the pattern would.
     private EmailDto sendAsyncInTransaction(EmailParameter email) {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {

@@ -78,17 +78,19 @@ public class ManageEmail {
     /**
      * Persists the email as {@link EmailState#PENDING} to be sent by the scheduler at {@code scheduledAt}.
      * <p>
-     * Must be called from within an active transaction: the email row is written in the caller's transaction, so
-     * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
-     * with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the transaction itself.
-     * Calling this method without an active transaction fails with an
-     * {@link org.springframework.transaction.IllegalTransactionStateException}. An {@link EmailException} marks the
-     * caller's transaction rollback-only: the caller's data is never committed without the email.
+     * Call this inside the transaction that writes the data the email is about: the email row joins the caller's
+     * transaction, so it commits and rolls back together with the caller's own data. The same holds for the
+     * attachment payloads with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the
+     * transaction itself. An {@link EmailException} marks the caller's transaction rollback-only: the caller's data
+     * is never committed without the email.
+     * <p>
+     * Without an active transaction the email is persisted in a transaction of its own. Use that only when the
+     * email is not tied to a database write.
      *
      * @return the stored email, in state {@link EmailState#PENDING}
      * @throws EmailException if an attachment payload cannot be stored
      */
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(propagation = Propagation.REQUIRED)
     public EmailDto schedule(@Valid EmailParameter email, @NotNull OffsetDateTime scheduledAt) {
         Email entity;
         try {
@@ -103,15 +105,17 @@ public class ManageEmail {
     }
 
     /**
-     * Persists the email as {@link EmailState#PENDING} in the caller's transaction and sends it right after that
-     * transaction commits. The caller never waits for the SMTP round-trip.
+     * Persists the email as {@link EmailState#PENDING} and sends it right after the surrounding transaction commits.
+     * The caller never waits for the SMTP round-trip.
      * <p>
-     * Must be called from within an active transaction: the email row is written in the caller's transaction, so
-     * it commits and rolls back together with the caller's own data. The same holds for the attachment payloads
-     * with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the transaction itself.
-     * Calling this method without an active transaction fails with an
-     * {@link org.springframework.transaction.IllegalTransactionStateException}. An {@link EmailException} marks the
-     * caller's transaction rollback-only: the caller's data is never committed without the email.
+     * Call this inside the transaction that writes the data the email is about: the email row joins the caller's
+     * transaction, so it commits and rolls back together with the caller's own data. The same holds for the
+     * attachment payloads with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the
+     * transaction itself. An {@link EmailException} marks the caller's transaction rollback-only: the caller's data
+     * is never committed without the email.
+     * <p>
+     * Without an active transaction the email is persisted in a transaction of its own and dispatched as soon as
+     * this method returns. Use that only when the email is not tied to a database write.
      * <p>
      * After the commit, the email id is handed to a bounded executor that claims the row with the same kind of
      * atomic update as the scheduler, so it is never sent twice. If the hand-off is lost (saturated executor, pod
@@ -122,7 +126,7 @@ public class ManageEmail {
      * @return the stored email, in state {@link EmailState#PENDING}
      * @throws EmailException if an attachment payload cannot be stored
      */
-    @Transactional(propagation = Propagation.MANDATORY)
+    @Transactional(propagation = Propagation.REQUIRED)
     public EmailDto sendAsync(@Valid EmailParameter email) {
         Email entity;
         try {

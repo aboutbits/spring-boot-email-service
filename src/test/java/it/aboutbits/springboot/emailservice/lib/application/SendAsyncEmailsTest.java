@@ -142,7 +142,7 @@ class SendAsyncEmailsTest {
         }
     }
 
-    // sendAsync() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
+    // Runs sendAsync() inside a caller's transaction and commits it, as an application following the pattern would.
     private static EmailDto sendAsyncInTransaction(
             ManageEmail manageEmail,
             PlatformTransactionManager transactionManager

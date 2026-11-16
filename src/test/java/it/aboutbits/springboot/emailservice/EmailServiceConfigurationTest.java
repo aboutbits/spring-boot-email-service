@@ -1,7 +1,6 @@
 package it.aboutbits.springboot.emailservice;
 
 import it.aboutbits.springboot.emailservice.lib.AttachmentDataSource;
-import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
 import it.aboutbits.springboot.emailservice.lib.application.EmailParameter;
 import it.aboutbits.springboot.emailservice.lib.application.ManageEmail;
@@ -13,8 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 
 import java.io.ByteArrayInputStream;
 import java.time.OffsetDateTime;
@@ -32,9 +29,6 @@ class EmailServiceConfigurationTest {
     @Autowired
     ManageEmail manageEmail;
 
-    @Autowired
-    PlatformTransactionManager transactionManager;
-
     @Test
     void givenNoAttachmentDataSourceBean_context_shouldStart() {
         assertThat(applicationContext.getBeanNamesForType(AttachmentDataSource.class)).isEmpty();
@@ -43,7 +37,7 @@ class EmailServiceConfigurationTest {
 
     @Test
     void givenNoAttachmentDataSourceBean_scheduleWithoutAttachment_shouldSucceed() {
-        var result = scheduleInTransaction(getValidParameterWithoutAttachment());
+        var result = manageEmail.schedule(getValidParameterWithoutAttachment(), OffsetDateTime.now());
 
         assertThat(result.id()).isPositive();
         assertThat(result.state()).isEqualTo(EmailState.PENDING);
@@ -54,21 +48,8 @@ class EmailServiceConfigurationTest {
         var parameter = getValidParameterWithAttachment();
 
         assertThatExceptionOfType(EmailException.class).isThrownBy(
-                () -> scheduleInTransaction(parameter)
+                () -> manageEmail.schedule(parameter, OffsetDateTime.now())
         ).withCauseInstanceOf(AttachmentException.class);
-    }
-
-    // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
-    private EmailDto scheduleInTransaction(EmailParameter parameter) {
-        var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
-        try {
-            var result = manageEmail.schedule(parameter, OffsetDateTime.now());
-            transactionManager.commit(transaction);
-            return result;
-        } catch (RuntimeException e) {
-            transactionManager.rollback(transaction);
-            throw e;
-        }
     }
 
     private static EmailParameter getValidParameterWithoutAttachment() {
