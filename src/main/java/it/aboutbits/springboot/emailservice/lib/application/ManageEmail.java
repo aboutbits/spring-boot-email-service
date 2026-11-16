@@ -86,9 +86,10 @@ public class ManageEmail {
      * caller's transaction rollback-only: the caller's data is never committed without the email.
      *
      * @return the stored email, in state {@link EmailState#PENDING}
+     * @throws EmailException if an attachment payload cannot be stored
      */
-    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = EmailException.class)
-    public EmailDto schedule(@Valid EmailParameter email, @NotNull OffsetDateTime scheduledAt) throws EmailException {
+    @Transactional(propagation = Propagation.MANDATORY)
+    public EmailDto schedule(@Valid EmailParameter email, @NotNull OffsetDateTime scheduledAt) {
         Email entity;
         try {
             entity = fromParameter(scheduledAt, email);
@@ -119,9 +120,10 @@ public class ManageEmail {
      * the scheduler alone sends the email.
      *
      * @return the stored email, in state {@link EmailState#PENDING}
+     * @throws EmailException if an attachment payload cannot be stored
      */
-    @Transactional(propagation = Propagation.MANDATORY, rollbackFor = EmailException.class)
-    public EmailDto sendAsync(@Valid EmailParameter email) throws EmailException {
+    @Transactional(propagation = Propagation.MANDATORY)
+    public EmailDto sendAsync(@Valid EmailParameter email) {
         Email entity;
         try {
             entity = fromParameter(OffsetDateTime.now(), email);
@@ -153,8 +155,9 @@ public class ManageEmail {
      * inside the transaction that writes the data.
      *
      * @return the stored email, in state {@link EmailState#SENT}
+     * @throws EmailException if an attachment payload cannot be stored or the send fails
      */
-    public EmailDto sendOrFail(@Valid EmailParameter email) throws EmailException {
+    public EmailDto sendOrFail(@Valid EmailParameter email) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             throw new IllegalTransactionStateException(
                     "sendOrFail must not be called within an active transaction"

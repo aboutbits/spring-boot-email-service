@@ -78,7 +78,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameters_schedule_shouldCreateNewNotification() throws EmailException {
+    void givenRequiredParameters_schedule_shouldCreateNewNotification() {
         var parameter = getValidParameterWithoutAttachment();
 
         var scheduledAt = OffsetDateTime.now().plusDays(1);
@@ -100,7 +100,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameterWithAttachedFiles_schedule_shouldCreateNewNotification() throws EmailException, AttachmentException {
+    void givenRequiredParameterWithAttachedFiles_schedule_shouldCreateNewNotification() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
 
         var parameter = getValidParameterWithAttachment();
@@ -124,7 +124,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameters_sendOrFail_shouldCreateNewNotification() throws EmailException {
+    void givenRequiredParameters_sendOrFail_shouldCreateNewNotification() {
         var parameter = getValidParameterWithoutAttachment();
 
         var result = manageEmail.sendOrFail(parameter);
@@ -144,7 +144,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameterWithAttachedFiles_sendOrFail_shouldCreateNewNotification() throws EmailException, AttachmentException {
+    void givenRequiredParameterWithAttachedFiles_sendOrFail_shouldCreateNewNotification() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
         when(attachmentDataSource.getAttachmentPayload(anyLong())).thenReturn(new ByteArrayInputStream(new byte[0]));
 
@@ -167,7 +167,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameters_sendOrFail_shouldSendImmediately() throws EmailException {
+    void givenRequiredParameters_sendOrFail_shouldSendImmediately() {
         EmailParameter parameter = getValidParameterWithoutAttachment();
 
         manageEmail.sendOrFail(parameter);
@@ -176,7 +176,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRequiredParameterWithAttachedFiles_sendOrFail_shouldSendImmediately() throws EmailException, AttachmentException {
+    void givenRequiredParameterWithAttachedFiles_sendOrFail_shouldSendImmediately() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
         when(attachmentDataSource.getAttachmentPayload(anyLong())).thenReturn(new ByteArrayInputStream(new byte[0]));
 
@@ -188,7 +188,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenInlineAttachment_schedule_shouldPersistContentId() throws EmailException, AttachmentException {
+    void givenInlineAttachment_schedule_shouldPersistContentId() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
 
         var parameter = getValidParameterWithInlineAttachment(
@@ -245,7 +245,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenUppercaseCidReference_schedule_shouldSucceed() throws EmailException, AttachmentException {
+    void givenUppercaseCidReference_schedule_shouldSucceed() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
 
         var parameter = getValidParameterWithInlineAttachment(
@@ -300,14 +300,14 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenCommittingTransaction_schedule_shouldPersistEmail() throws EmailException {
+    void givenCommittingTransaction_schedule_shouldPersistEmail() {
         var result = scheduleInTransaction(getValidParameterWithoutAttachment());
 
         assertThat(emailRepository.findById(result.id())).isPresent();
     }
 
     @Test
-    void givenRollingBackTransaction_schedule_shouldNotPersistEmail() throws EmailException {
+    void givenRollingBackTransaction_schedule_shouldNotPersistEmail() {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         var result = manageEmail.schedule(getValidParameterWithoutAttachment(), OffsetDateTime.now());
         transactionManager.rollback(transaction);
@@ -345,7 +345,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenCommittingTransaction_sendAsync_shouldSendRightAfterCommit() throws EmailException {
+    void givenCommittingTransaction_sendAsync_shouldSendRightAfterCommit() {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         var result = manageEmail.sendAsync(getValidParameterWithoutAttachment());
 
@@ -365,7 +365,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenRollingBackTransaction_sendAsync_shouldNeitherPersistNorSend() throws EmailException {
+    void givenRollingBackTransaction_sendAsync_shouldNeitherPersistNorSend() {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         var result = manageEmail.sendAsync(getValidParameterWithoutAttachment());
         transactionManager.rollback(transaction);
@@ -382,7 +382,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenMailSenderError_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
+    void givenMailSenderError_sendAsync_shouldLeaveEmailToTheScheduler() {
         doThrow(new MailSendException("any")).when(javaMailSender).send(any(MimeMessage.class));
 
         var result = sendAsyncInTransaction(getValidParameterWithoutAttachment());
@@ -408,7 +408,7 @@ class ManageEmailTest {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException("store down"));
         var email = getValidParameterWithAttachment();
 
-        // A caller that swallows the checked exception and carries on, as Spring's default rules would let it
+        // A caller that swallows the exception and carries on
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         assertThatExceptionOfType(EmailException.class).isThrownBy(
                 () -> manageEmail.sendAsync(email)
@@ -455,7 +455,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenAttachmentError_sendOrFail_shouldFail() throws EmailException, AttachmentException {
+    void givenAttachmentError_sendOrFail_shouldFail() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenThrow(new AttachmentException());
 
         var parameter = getValidParameterWithAttachment();
@@ -466,7 +466,7 @@ class ManageEmailTest {
     }
 
     @Test
-    void givenMailSenderError_sendOrFail_shouldFail() throws EmailException, AttachmentException {
+    void givenMailSenderError_sendOrFail_shouldFail() throws AttachmentException {
         when(attachmentDataSource.storeAttachmentPayload(any())).thenReturn(33L);
         when(attachmentDataSource.getAttachmentPayload(anyLong())).thenReturn(new ByteArrayInputStream(new byte[0]));
 
@@ -484,7 +484,7 @@ class ManageEmailTest {
     @WithPostgres
     class SendAsync {
         @Test
-        void givenAsyncDispatchDisabled_sendAsync_shouldLeaveEmailToTheScheduler() throws EmailException {
+        void givenAsyncDispatchDisabled_sendAsync_shouldLeaveEmailToTheScheduler() {
             var result = sendAsyncInTransaction(getValidParameterWithoutAttachment());
 
             // Nothing is dispatched after the commit
@@ -502,30 +502,30 @@ class ManageEmailTest {
     }
 
     // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
-    private EmailDto scheduleInTransaction(EmailParameter parameter) throws EmailException {
+    private EmailDto scheduleInTransaction(EmailParameter parameter) {
         return scheduleInTransaction(parameter, OffsetDateTime.now());
     }
 
-    private EmailDto scheduleInTransaction(EmailParameter parameter, OffsetDateTime scheduledAt) throws EmailException {
+    private EmailDto scheduleInTransaction(EmailParameter parameter, OffsetDateTime scheduledAt) {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
             var result = manageEmail.schedule(parameter, scheduledAt);
             transactionManager.commit(transaction);
             return result;
-        } catch (EmailException | RuntimeException e) {
+        } catch (RuntimeException e) {
             transactionManager.rollback(transaction);
             throw e;
         }
     }
 
     // sendAsync() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
-    private EmailDto sendAsyncInTransaction(EmailParameter email) throws EmailException {
+    private EmailDto sendAsyncInTransaction(EmailParameter email) {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
             var result = manageEmail.sendAsync(email);
             transactionManager.commit(transaction);
             return result;
-        } catch (EmailException | RuntimeException e) {
+        } catch (RuntimeException e) {
             transactionManager.rollback(transaction);
             throw e;
         }

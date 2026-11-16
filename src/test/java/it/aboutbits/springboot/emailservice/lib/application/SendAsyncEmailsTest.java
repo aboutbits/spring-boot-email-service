@@ -2,7 +2,6 @@ package it.aboutbits.springboot.emailservice.lib.application;
 
 import it.aboutbits.springboot.emailservice.lib.EmailDto;
 import it.aboutbits.springboot.emailservice.lib.EmailState;
-import it.aboutbits.springboot.emailservice.lib.exception.EmailException;
 import it.aboutbits.springboot.emailservice.lib.jpa.EmailRepository;
 import it.aboutbits.springboot.emailservice.support.database.WithPostgres;
 import jakarta.mail.internet.MimeMessage;
@@ -147,13 +146,13 @@ class SendAsyncEmailsTest {
     private static EmailDto sendAsyncInTransaction(
             ManageEmail manageEmail,
             PlatformTransactionManager transactionManager
-    ) throws EmailException {
+    ) {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
             var result = manageEmail.sendAsync(validEmail());
             transactionManager.commit(transaction);
             return result;
-        } catch (EmailException | RuntimeException e) {
+        } catch (RuntimeException e) {
             transactionManager.rollback(transaction);
             throw e;
         }

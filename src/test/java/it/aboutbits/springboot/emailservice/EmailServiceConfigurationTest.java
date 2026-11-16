@@ -42,7 +42,7 @@ class EmailServiceConfigurationTest {
     }
 
     @Test
-    void givenNoAttachmentDataSourceBean_scheduleWithoutAttachment_shouldSucceed() throws EmailException {
+    void givenNoAttachmentDataSourceBean_scheduleWithoutAttachment_shouldSucceed() {
         var result = scheduleInTransaction(getValidParameterWithoutAttachment());
 
         assertThat(result.id()).isPositive();
@@ -59,13 +59,13 @@ class EmailServiceConfigurationTest {
     }
 
     // schedule() requires an active transaction (MANDATORY); run it in one and commit, as an application would.
-    private EmailDto scheduleInTransaction(EmailParameter parameter) throws EmailException {
+    private EmailDto scheduleInTransaction(EmailParameter parameter) {
         var transaction = transactionManager.getTransaction(TransactionDefinition.withDefaults());
         try {
             var result = manageEmail.schedule(parameter, OffsetDateTime.now());
             transactionManager.commit(transaction);
             return result;
-        } catch (EmailException | RuntimeException e) {
+        } catch (RuntimeException e) {
             transactionManager.rollback(transaction);
             throw e;
         }
