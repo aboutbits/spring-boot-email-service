@@ -136,6 +136,7 @@
             <groupId>it.aboutbits</groupId>
             <artifactId>spring-boot-testing</artifactId>
             <version>2.7.0</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
