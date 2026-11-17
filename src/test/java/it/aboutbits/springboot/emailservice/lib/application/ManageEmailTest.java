@@ -288,6 +288,21 @@ class ManageEmailTest {
     }
 
     @Test
+    void givenAttachmentWithBlankFileName_schedule_shouldFail() {
+        var parameter = getValidParameterWithInlineAttachment(
+                "<h1>Html email body</h1>",
+                regularAttachment(" ")
+        );
+
+        assertThatExceptionOfType(ConstraintViolationException.class)
+                .isThrownBy(() -> scheduleInTransaction(parameter))
+                .satisfies(exception -> assertThat(exception.getConstraintViolations())
+                        .singleElement()
+                        .satisfies(violation -> assertThat(violation.getPropertyPath())
+                                .hasToString("schedule.email.attachments[].fileName")));
+    }
+
+    @Test
     void givenNoActiveTransaction_schedule_shouldPersistEmail() {
         var result = manageEmail.schedule(getValidParameterWithoutAttachment(), OffsetDateTime.now());
 

@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.4</version>
+        <version>4.1.2</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -13,12 +13,39 @@
     <artifactId>emailservice</artifactId>
     <version>2.0.0</version>
     <description>Spring Boot Email Service</description>
+    <url>https://github.com/aboutbits/spring-boot-email-service</url>
+
+    <organization>
+        <name>About Bits GmbH</name>
+        <url>https://aboutbits.it</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://github.com/aboutbits/spring-boot-email-service/blob/main/license.md</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>About Bits GmbH</name>
+            <organization>About Bits GmbH</organization>
+            <organizationUrl>https://aboutbits.it</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/aboutbits/spring-boot-email-service</url>
+        <connection>scm:git:https://github.com/aboutbits/spring-boot-email-service.git</connection>
+        <developerConnection>scm:git:git@github.com:aboutbits/spring-boot-email-service.git</developerConnection>
+    </scm>
 
     <properties>
         <java.version>25</java.version>
         <mapstruct.version>1.6.3</mapstruct.version>
-        <nullaway.version>0.13.2</nullaway.version>
-        <errorprone.version>2.49.0</errorprone.version>
+        <nullaway.version>0.14.4</nullaway.version>
+        <errorprone.version>2.52.0</errorprone.version>
     </properties>
 
     <dependencyManagement>
@@ -26,7 +53,7 @@
             <dependency>
                 <groupId>it.aboutbits</groupId>
                 <artifactId>archunit-toolbox</artifactId>
-                <version>1.1.0</version>
+                <version>1.5.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -82,25 +109,22 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
-            <version>2.0.5</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-junit-jupiter</artifactId>
-            <version>2.0.5</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
-            <version>2.0.5</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.tngtech.archunit</groupId>
-            <artifactId>archunit-junit5</artifactId>
-            <version>1.4.2</version>
+            <artifactId>archunit-junit6</artifactId>
+            <version>1.5.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -111,7 +135,8 @@
         <dependency>
             <groupId>it.aboutbits</groupId>
             <artifactId>spring-boot-testing</artifactId>
-            <version>2.5.0</version>
+            <version>2.7.0</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -120,7 +145,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.15.0</version>
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
@@ -201,9 +225,28 @@
                     <dependency>
                         <groupId>com.puppycrawl.tools</groupId>
                         <artifactId>checkstyle</artifactId>
-                        <version>13.5.0</version>
+                        <version>13.8.0</version>
                     </dependency>
                 </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>properties</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <!-- Load Mockito as a Java agent, because future JDKs block its self-attach (https://javadoc.io/doc/org.mockito/mockito-core/latest/org.mockito/org/mockito/Mockito.html#0.3). Class data sharing is off, because the Mockito inline mock maker appends to the bootstrap class path and the JVM then warns. -->
+                    <argLine>-javaagent:"${org.mockito:mockito-core:jar}" -Xshare:off</argLine>
+                </configuration>
             </plugin>
         </plugins>
     </build>
