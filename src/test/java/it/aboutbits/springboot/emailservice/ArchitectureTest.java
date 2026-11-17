@@ -2,14 +2,16 @@ package it.aboutbits.springboot.emailservice;
 
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.CacheMode;
-import it.aboutbits.archunit.toolbox.ArchitectureTestBase;
+import it.aboutbits.archunit.toolbox.BaseArchRuleCollection;
+import it.aboutbits.archunit.toolbox.support.ArchIgnoreNoProductionCounterpart;
 import org.jspecify.annotations.NullMarked;
 
+// BaseArchRuleCollection instead of CommonArchRuleCollection: this library has no Spring MVC controllers and no SortMappings, so the two rules of CommonArchRuleCollection have nothing to check.
 @AnalyzeClasses(
-        packages = ArchitectureTest.PACKAGE,
+        packagesOf = ArchitectureTest.class,
         cacheMode = CacheMode.PER_CLASS
 )
 @NullMarked
-class ArchitectureTest extends ArchitectureTestBase {
-    static final String PACKAGE = "it.aboutbits.springboot.emailservice";
+@ArchIgnoreNoProductionCounterpart
+class ArchitectureTest implements BaseArchRuleCollection {
 }
