@@ -42,8 +42,7 @@ public record EmailParameter(
         String replyToName,
 
         @Singular
-        @Valid
-        Set<Attachment> attachments
+        Set<@Valid Attachment> attachments
 ) {
     // the "cid:" scheme is case-insensitive, the contentId itself is not
     private static final Pattern CID_REFERENCE_PATTERN = Pattern.compile(
