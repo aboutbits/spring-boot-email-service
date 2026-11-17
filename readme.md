@@ -6,6 +6,8 @@ A reusable mailer service to send emails.
 
 Add the mailer service to the classpath by adding the following maven dependency. Versions can be found [here](../../packages)
 
+Upgrade notes for each version are in the [GitHub releases](../../releases).
+
 ```xml
 
 <dependency>
