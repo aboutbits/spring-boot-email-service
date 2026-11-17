@@ -9,7 +9,7 @@
         {
             "name": "aboutbits.emailservice.scheduling.enabled",
             "type": "java.lang.Boolean",
-            "description": "Enables the scheduler sending the emails.",
+            "description": "Enables the scheduler sending the emails. The scheduler also performs the retries and crash recovery for sendAsync; when it is disabled on a pod, another pod must run it against the same database.",
             "defaultValue": true
         },
         {
@@ -27,7 +27,7 @@
         {
             "name": "aboutbits.emailservice.scheduling.stuck-sending-recovery-threshold",
             "type": "java.time.Duration",
-            "description": "How long an email may stay in the SENDING state before being considered abandoned (crashed pod) and eligible to be re-claimed by another pod. Must comfortably exceed the worst-case SMTP send duration: JavaMail's default connect/read/write timeouts are infinite, so configure spring.mail.properties.mail.smtp.connectiontimeout, spring.mail.properties.mail.smtp.timeout and spring.mail.properties.mail.smtp.writetimeout well below this threshold, otherwise a slow in-flight send can be re-claimed by another pod and delivered twice.",
+            "description": "How long an email may stay in the SENDING state before being considered abandoned (crashed pod) and eligible to be re-claimed by another pod. Must comfortably exceed the worst-case SMTP send duration: JavaMail's default connect/read/write timeouts are infinite, so configure spring.mail.properties.mail.smtp.connectiontimeout, spring.mail.properties.mail.smtp.timeout and spring.mail.properties.mail.smtp.writetimeout well below this threshold, otherwise a slow in-flight send can be re-claimed by another pod and delivered twice. This applies to sends of the after-commit dispatch as well.",
             "defaultValue": "PT30M"
         },
         {
@@ -37,9 +37,27 @@
             "defaultValue": "PT30M"
         },
         {
+            "name": "aboutbits.emailservice.async-dispatch.enabled",
+            "type": "java.lang.Boolean",
+            "description": "Sends emails queued via ManageEmail.sendAsync right after the caller's transaction committed, on a bounded executor. When disabled, such emails are sent by the scheduler only; recommended for tests. On shutdown the library waits up to 30 seconds for queued and in-flight sends. Queued sends that have not started by then are dropped and stay PENDING for the scheduler; a send still in flight finishes if it can, otherwise its row stays SENDING until the recovery threshold.",
+            "defaultValue": true
+        },
+        {
+            "name": "aboutbits.emailservice.async-dispatch.threads",
+            "type": "java.lang.Integer",
+            "description": "Number of threads of the executor sending emails right after commit, i.e. how many SMTP sends run in parallel per pod. The default of one matches the scheduler, which sends sequentially. Must be at least 1.",
+            "defaultValue": 1
+        },
+        {
+            "name": "aboutbits.emailservice.async-dispatch.queue-capacity",
+            "type": "java.lang.Integer",
+            "description": "Maximum number of emails waiting for a thread of the after-commit executor. When the queue is full, the hand-off is dropped and the scheduler sends the email instead. Must be at least 1.",
+            "defaultValue": 100
+        },
+        {
             "name": "aboutbits.emailservice.scheduling.max-attempts",
             "type": "java.lang.Integer",
-            "description": "Maximum number of send attempts before an email is marked as ERROR. Applies to the scheduled retry loop; the synchronous sendOrFail path is fail-fast and does not retry. Failed attempts are retried with exponential backoff (scheduling.interval x 2^attempts); with the defaults a persistently failing email runs attempt 1 -> +60s -> attempt 2 -> +120s -> attempt 3 -> ERROR.",
+            "description": "Maximum number of send attempts before an email is marked as ERROR. Applies to sendAsync and schedule; the attempt right after commit counts as the first one. sendOrFail makes exactly one attempt and is never retried. Failed attempts are retried with exponential backoff (scheduling.interval x 2^attempts); with the defaults a persistently failing email runs attempt 1 -> +60s -> attempt 2 -> +120s -> attempt 3 -> ERROR.",
             "defaultValue": 3
         }
     ]

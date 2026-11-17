@@ -3,7 +3,7 @@ package it.aboutbits.springboot.emailservice.lib.exception;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked
-public class EmailException extends Exception {
+public class EmailException extends RuntimeException {
     public EmailException() {
         super();
     }

@@ -12,15 +12,20 @@ import it.aboutbits.springboot.emailservice.lib.model.EmailAttachment;
 import it.aboutbits.springboot.emailservice.lib.model.EmailContent;
 import jakarta.mail.MessagingException;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.FileCopyUtils;
 import org.springframework.validation.annotation.Validated;
@@ -45,7 +50,9 @@ public class ManageEmail {
     private final int maxAttempts;
     private final Duration schedulerInterval;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
+    @SuppressWarnings("checkstyle:ParameterNumber")
     public ManageEmail(
             EmailRepository emailRepository,
             JavaMailSender mailSender,
@@ -53,7 +60,8 @@ public class ManageEmail {
             EmailMapper emailMapper,
             int maxAttempts,
             Duration schedulerInterval,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.emailRepository = emailRepository;
         this.mailSender = mailSender;
@@ -61,47 +69,127 @@ public class ManageEmail {
         this.emailMapper = emailMapper;
         this.maxAttempts = maxAttempts;
         this.schedulerInterval = schedulerInterval;
+        this.eventPublisher = eventPublisher;
         // Persist the final email state in its own, independent transaction to never make it roll back
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
-    public EmailDto schedule(@Valid EmailParameter parameter) throws EmailException {
-        Email email;
+    /**
+     * Persists the email as {@link EmailState#PENDING} to be sent by the scheduler at {@code scheduledAt}.
+     * <p>
+     * Call this inside the transaction that writes the data the email is about: the email row joins the caller's
+     * transaction, so it commits and rolls back together with the caller's own data. The same holds for the
+     * attachment payloads with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the
+     * transaction itself. An {@link EmailException} marks the caller's transaction rollback-only: the caller's data
+     * is never committed without the email.
+     * <p>
+     * Without an active transaction the email is persisted in a transaction of its own. Use that only when the
+     * email is not tied to a database write.
+     *
+     * @return the stored email, in state {@link EmailState#PENDING}
+     * @throws EmailException if an attachment payload cannot be stored
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public EmailDto schedule(@Valid EmailParameter email, @NotNull OffsetDateTime scheduledAt) {
+        Email entity;
         try {
-            email = fromParameter(parameter);
+            entity = fromParameter(scheduledAt, email);
         } catch (AttachmentException e) {
             throw new EmailException(e);
         }
 
-        var savedEmail = emailRepository.save(email);
+        var savedEmail = emailRepository.save(entity);
 
         return emailMapper.toDto(savedEmail);
     }
 
-    public EmailDto sendOrFail(@Valid EmailParameter parameter) throws EmailException {
-        Email email;
+    /**
+     * Persists the email as {@link EmailState#PENDING} and sends it right after the surrounding transaction commits.
+     * The caller never waits for the SMTP round-trip.
+     * <p>
+     * Call this inside the transaction that writes the data the email is about: the email row joins the caller's
+     * transaction, so it commits and rolls back together with the caller's own data. The same holds for the
+     * attachment payloads with the default JDBC {@link AttachmentDataSource}; a custom one must take part in the
+     * transaction itself. An {@link EmailException} marks the caller's transaction rollback-only: the caller's data
+     * is never committed without the email.
+     * <p>
+     * Without an active transaction the email is persisted in a transaction of its own and dispatched as soon as
+     * this method returns. Use that only when the email is not tied to a database write.
+     * <p>
+     * After the commit, the email id is handed to a bounded executor that claims the row with the same kind of
+     * atomic update as the scheduler, so it is never sent twice. If the hand-off is lost (saturated executor, pod
+     * restart) or the send fails, the scheduler picks the email up and retries it like any scheduled email. With
+     * {@code aboutbits.emailservice.async-dispatch.enabled=false} (recommended for tests) nothing is dispatched and
+     * the scheduler alone sends the email.
+     *
+     * @return the stored email, in state {@link EmailState#PENDING}
+     * @throws EmailException if an attachment payload cannot be stored
+     */
+    @Transactional(propagation = Propagation.REQUIRED)
+    public EmailDto sendAsync(@Valid EmailParameter email) {
+        Email entity;
         try {
-            email = fromParameter(parameter);
+            entity = fromParameter(OffsetDateTime.now(), email);
         } catch (AttachmentException e) {
             throw new EmailException(e);
         }
 
-        email.setExecutionStartTime(OffsetDateTime.now());
-        email.incrementAttempts();
+        var savedEmail = emailRepository.save(entity);
 
-        try {
-            sendMail(email);
-            email.setState(EmailState.SENT);
-            email.setExecutionEndTime(OffsetDateTime.now());
-        } catch (MessagingException | AttachmentException | IOException | RuntimeException e) {
-            log.error("Failed to send email: {}", email.getId(), e);
-            email.setState(EmailState.ERROR);
-            email.setExecutionEndTime(OffsetDateTime.now());
-            email.setErrorMessage(e.getMessage());
+        // Consumed by SendAsyncEmails after the commit; ignored when the async dispatch is disabled.
+        eventPublisher.publishEvent(new AsyncEmailQueued(savedEmail.getId()));
+
+        return emailMapper.toDto(savedEmail);
+    }
+
+    /**
+     * Sends the email at once, in a single attempt, and persists the outcome. The caller waits for the SMTP round-trip.
+     * If the send fails, the email is stored as {@link EmailState#ERROR},
+     * is not retried, and an {@link EmailException} is thrown.
+     * <p>
+     * Must be called outside any transaction. Inside one, the SMTP round-trip would run while the caller's database
+     * connection is held, and persisting the outcome would need a second connection at the same time.
+     * Calling this method within an active transaction fails with an
+     * {@link org.springframework.transaction.IllegalTransactionStateException}.
+     * <p>
+     * Use this only when the email is not tied to a database write,
+     * i.e. when the email and the caller's data need not stay consistent with each other.
+     * Otherwise, use {@link #sendAsync(EmailParameter)} or {@link #schedule(EmailParameter, OffsetDateTime)}
+     * inside the transaction that writes the data.
+     *
+     * @return the stored email, in state {@link EmailState#SENT}
+     * @throws EmailException if an attachment payload cannot be stored or the send fails
+     */
+    public EmailDto sendOrFail(@Valid EmailParameter email) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalTransactionStateException(
+                    "sendOrFail must not be called within an active transaction"
+            );
         }
 
-        var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(email));
+        Email entity;
+        try {
+            entity = fromParameter(OffsetDateTime.now(), email);
+        } catch (AttachmentException e) {
+            throw new EmailException(e);
+        }
+
+        entity.setExecutionStartTime(OffsetDateTime.now());
+        entity.incrementAttempts();
+
+        try {
+            sendMail(entity);
+            entity.setState(EmailState.SENT);
+            entity.setExecutionEndTime(OffsetDateTime.now());
+        } catch (MessagingException | AttachmentException | IOException | RuntimeException e) {
+            log.error("Failed to send email: {}", entity.getId(), e);
+            entity.setState(EmailState.ERROR);
+            entity.setExecutionEndTime(OffsetDateTime.now());
+            entity.setErrorMessage(e.getMessage());
+        }
+
+        var savedEmail = transactionTemplate.execute(_ -> emailRepository.save(entity));
 
         if (savedEmail.getState() == EmailState.ERROR) {
             throw new EmailException("Failed to send email [id=%s, providerMessage=%s]"
@@ -115,6 +203,15 @@ public class ManageEmail {
     @Transactional
     Optional<Email> tryClaimForSend(long id, OffsetDateTime staleSendingBefore) {
         var claimed = emailRepository.claimForSend(id, OffsetDateTime.now(), staleSendingBefore);
+        return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
+    }
+
+    // Like tryClaimForSend, but only for a row that has not been attempted yet and never for a stale SENDING row:
+    // the after-commit dispatch performs the first attempt of the row it just inserted, nothing else.
+    // Retries and recovering rows abandoned by a crashed pod are the scheduler's job.
+    @Transactional
+    Optional<Email> tryClaimPendingForSend(long id) {
+        var claimed = emailRepository.claimPendingForSend(id, OffsetDateTime.now());
         return claimed == 0 ? Optional.empty() : emailRepository.findById(id);
     }
 
@@ -226,12 +323,10 @@ public class ManageEmail {
         mailSender.send(message);
     }
 
-    private Email fromParameter(EmailParameter parameter) throws AttachmentException {
-        var emailData = parameter.email();
-
+    private Email fromParameter(OffsetDateTime scheduledAt, EmailParameter emailData) throws AttachmentException {
         var email = new Email();
         email.setState(EmailState.PENDING);
-        email.setScheduledAt(parameter.scheduledAt());
+        email.setScheduledAt(scheduledAt);
         email.setContent(new EmailContent(
                 emailData.subject(),
                 emailData.fromAddress(),
@@ -244,7 +339,7 @@ public class ManageEmail {
         ));
 
         var attachments = new HashSet<EmailAttachment>();
-        for (var attachment : parameter.email().attachments()) {
+        for (var attachment : emailData.attachments()) {
             var reference = attachmentDataSource.storeAttachmentPayload(attachment.payload());
 
             var emailAttachment = new EmailAttachment();

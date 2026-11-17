@@ -42,7 +42,7 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
     // Includes SENDING rows abandoned by crashed pods (past the stale threshold).
     @Query("""
             select e.id from Email e
-                where e.scheduledAt < :now
+                where e.scheduledAt <= :now
                     and (
                         e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
                         or (
@@ -69,7 +69,7 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
                    e.errorMessage = null,
                    e.attempts = e.attempts + 1
                where e.id = :id
-                   and e.scheduledAt < :now
+                   and e.scheduledAt <= :now
                    and (
                        e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
                        or (
@@ -82,6 +82,28 @@ public interface EmailRepository extends JpaRepository<Email, Long> {
             @Param("id") long id,
             @Param("now") OffsetDateTime now,
             @Param("staleSendingBefore") OffsetDateTime staleSendingBefore
+    );
+
+    // Same compare-and-set as claimForSend, restricted to a due PENDING row that has not been attempted yet. Used by
+    // the after-commit dispatch, which performs the first attempt only: retries and stale-SENDING recovery are the
+    // scheduler's job, so every retry (and every terminal ERROR after the first attempt) goes through the scheduler
+    // and reaches its callback, even when a dispatch task was delayed past a retry backoff.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Email e
+               set e.state = it.aboutbits.springboot.emailservice.lib.EmailState.SENDING,
+                   e.executionStartTime = :now,
+                   e.executionEndTime = null,
+                   e.errorMessage = null,
+                   e.attempts = e.attempts + 1
+               where e.id = :id
+                   and e.scheduledAt <= :now
+                   and e.state = it.aboutbits.springboot.emailservice.lib.EmailState.PENDING
+                   and e.attempts = 0
+            """)
+    int claimPendingForSend(
+            @Param("id") long id,
+            @Param("now") OffsetDateTime now
     );
 
     // Plain read, no locking -> two pods may see overlapping candidate sets.
