@@ -13,6 +13,33 @@
     <artifactId>emailservice</artifactId>
     <version>1.3.0</version>
     <description>Spring Boot Email Service</description>
+    <url>https://github.com/aboutbits/spring-boot-email-service</url>
+
+    <organization>
+        <name>About Bits GmbH</name>
+        <url>https://aboutbits.it</url>
+    </organization>
+
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://github.com/aboutbits/spring-boot-email-service/blob/main/license.md</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>About Bits GmbH</name>
+            <organization>About Bits GmbH</organization>
+            <organizationUrl>https://aboutbits.it</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/aboutbits/spring-boot-email-service</url>
+        <connection>scm:git:https://github.com/aboutbits/spring-boot-email-service.git</connection>
+        <developerConnection>scm:git:git@github.com:aboutbits/spring-boot-email-service.git</developerConnection>
+    </scm>
 
     <properties>
         <java.version>25</java.version>
